@@ -10,3 +10,7 @@ venv/
 
 # Dataset folder (do not commit!)
 daic_data/
+
+# System-generated hidden files
+.DS_Store
+.ipynb_checkpoints/
