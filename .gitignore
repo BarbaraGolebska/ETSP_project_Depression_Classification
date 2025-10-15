@@ -10,7 +10,7 @@ venv/
 .env
 
 # Dataset folder (do not commit!)
-daic_data/
+data/
 
 # System-generated hidden files
 .DS_Store

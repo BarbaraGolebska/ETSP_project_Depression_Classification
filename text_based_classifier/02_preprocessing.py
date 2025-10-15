@@ -3,7 +3,7 @@ from pathlib import Path
 import pandas as pd
 
 
-TRANSCRIPTS_DIR = Path("../daic_data/EDAIC_text/transcripts")
+TRANSCRIPTS_DIR = Path("../data/raw/transcripts")
 CONFIDENCE_THRESHOLD = 0.6  # the minimum value of confidence to consider a certain transcription
 
 
@@ -33,7 +33,7 @@ def main():
     participants_df = pd.DataFrame(docs)
 
     # get labels
-    labels_df = pd.read_csv('../daic_data/EDAIC_text/labels/detailed_lables.csv').rename(
+    labels_df = pd.read_csv('../data/raw/labels/detailed_labels.csv').rename(
         columns={"Participant": "participant_id", "Depression_label": "target_depr", "PTSD_label": "target_ptsd"})
 
     # ensure "participant_id" is string in both dfs
@@ -45,9 +45,9 @@ def main():
                                  on="participant_id", how="inner")
 
     # save the data
-    output_dir = Path("../daic_data/processed")
+    output_dir = Path("../data/processed")
     output_dir.mkdir(exist_ok=True)
-    data.to_csv(output_dir / "combined.csv")
+    data.to_csv(output_dir / "text_combined.csv")
 
 
 if __name__ == "__main__":

@@ -1,5 +1,3 @@
-import nltk
-
 import pandas as pd
 import re
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -34,7 +32,7 @@ def nltk_preprocess(text):
 
 def main():
     # get the combined dataset
-    df = pd.read_csv("../daic_data/processed/combined.csv", index_col=0)
+    df = pd.read_csv("../data/raw/text_combined.csv", index_col=0)
 
     # get only "train" part of the dataset
     df_train = df[df["split"] == "train"]
