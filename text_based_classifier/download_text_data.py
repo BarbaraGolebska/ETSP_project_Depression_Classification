@@ -1,5 +1,6 @@
 import gdown
 import zipfile
+import os
 from tqdm import tqdm
 
 
@@ -9,6 +10,8 @@ EXTRACT_DIR = "../daic_data"
 
 
 def main():
+    os.makedirs(os.path.dirname(OUTPUT) or ".", exist_ok=True)
+
     print("Downloading E-DAIC Text Only dataset from Google Drive...")
     gdown.download(id=FILE_ID, output=OUTPUT, quiet=False)
 
