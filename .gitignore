@@ -4,9 +4,12 @@ __pycache__/
 
 # Virtual environment
 venv/
+.venv/
 
 # Environment variables
 .env
 
 # Dataset folder (do not commit!)
-daic_data/
+data/raw/
+data/processed/
+data/nltk_data/
