@@ -25,12 +25,20 @@ def main():
         print(f"Processing patient: {pid}")
         ftypes = {
             "bow_egemaps": f"{pid}_BoAW_openSMILE_2.3.0_eGeMAPS.csv",
-            "bow_mfcc": f"{pid}_BoAW_openSMILE_2.3.0_MFCC.csv"
+            "bow_mfcc": f"{pid}_BoAW_openSMILE_2.3.0_MFCC.csv",
+            #"densenet201": f"{pid}_densenet201.csv",
+            #"vgg16": f"{pid}_vgg16.csv",
+            #"ek_egemaps":f"{pid}_OpenSMILE2.3.0_egemaps.csv",
+            #"ek_mfcc":f"{pid}_OpenSMILE2.3.0_mfcc.csv"
         }
 
         patient_summary = []
         for ftype, path in ftypes.items():
-            df = pd.read_csv(f"data/raw/features/{path}",  header=None)
+            if ftype in ["ek_egemaps", "ek_mfcc"]:
+                df = pd.read_csv(f"data/raw/features/{path}",  sep=';')
+
+            else:
+                df = pd.read_csv(f"data/raw/features/{path}", sep='[,;]', engine='python', header=None)
             agg = aggregate_features(df)
             agg.index = [f"{ftype}_{col}" for col in agg.index]
             patient_summary.append(agg)
@@ -45,7 +53,7 @@ def main():
                                     on="participant_id", how="inner")
     
     data = data.set_index("participant_id")
-    data.to_csv("data/processed/BoW_aggregated_features.csv")
+    data.to_csv("data/processed/corrected_BoW_aggregated_features.csv")
 
 if __name__ == "__main__":
     main()
