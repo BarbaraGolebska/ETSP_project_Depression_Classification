@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 import re
 import optuna
-
 from imblearn.under_sampling import RandomUnderSampler
+from joblib import Parallel, delayed
 from matplotlib import pyplot as plt
 from sklearn.feature_extraction.text import TfidfVectorizer
 from nltk.corpus import wordnet
@@ -14,6 +14,9 @@ from sklearn.metrics import ConfusionMatrixDisplay, classification_report, fbeta
 from imblearn.pipeline import make_pipeline
 from sklearn.model_selection import StratifiedKFold
 
+OPTUNA_STUDY_NAME = "baseline_lr"
+OPTUNA_N_TRIALS = 100
+OPTUNA_STORAGE_PATH = "./baseline_optuna_journal_storage.log"
 
 # NLTK related functions
 
@@ -73,11 +76,9 @@ def get_pipeline(model_params):
                     token_pattern=None,
                 )
     undersampler = RandomUnderSampler(random_state=42)
-    lr = LogisticRegression(**model_params,
-                            random_state=42)
+    lr = LogisticRegression(**model_params, random_state=42)
 
-    pipeline = make_pipeline(vectorizer, undersampler, lr)
-    return pipeline
+    return make_pipeline(vectorizer, undersampler, lr)
 
 
 def train_evaluate(X_train, y_depr_train, model_params):
@@ -97,11 +98,25 @@ def train_evaluate(X_train, y_depr_train, model_params):
     return np.mean(scores)
 
 
+# optuna related functions
+
+def get_optuna_storage():
+    storage = optuna.storages.JournalStorage(
+        optuna.storages.journal.JournalFileBackend(OPTUNA_STORAGE_PATH),
+    )
+    return storage
+
+
 def objective(trial, X_train, y_depr_train):
     model_params = {'solver': trial.suggest_categorical('solver', ['lbfgs', 'liblinear', 'newton-cg']),  # small dataset friendly
-              'C': trial.suggest_float("C", 1e-7, 10.0, log=True)}
+                    'C': trial.suggest_float("C", 1e-7, 10.0, log=True)}
 
     return train_evaluate(X_train, y_depr_train, model_params)
+
+
+def run_optimization(X_train, y_depr_train):
+    study = optuna.load_study(study_name="baseline_lr", storage=get_optuna_storage())
+    study.optimize(lambda trial: objective(trial, X_train, y_depr_train), n_trials=1)
 
 
 def main():
@@ -114,8 +129,16 @@ def main():
 
     X_train, y_depr_train, X_dev, y_depr_dev = get_X_y_split(df_train, df_dev)
 
-    study = optuna.create_study(direction='maximize')
-    study.optimize(lambda trial: objective(trial, X_train, y_depr_train), n_trials=100)
+    # run hyperparameter optimization
+    optuna.create_study(study_name=OPTUNA_STUDY_NAME, storage=get_optuna_storage(), direction='maximize', load_if_exists=True)
+
+    Parallel(n_jobs=-1, backend='multiprocessing')(
+        delayed(run_optimization)(X_train, y_depr_train)
+        for _ in range(OPTUNA_N_TRIALS)
+    )
+
+    # get the results from hyperparameter optimization
+    study = optuna.load_study(study_name=OPTUNA_STUDY_NAME, storage=get_optuna_storage())
 
     # get the pipeline wth the chosen parameters
     pipeline = get_pipeline(study.best_trial.params)
