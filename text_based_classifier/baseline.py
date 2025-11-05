@@ -10,12 +10,13 @@ from nltk.corpus import wordnet
 from nltk import pos_tag
 from nltk.stem import WordNetLemmatizer
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import ConfusionMatrixDisplay, classification_report, fbeta_score
+from sklearn.metrics import ConfusionMatrixDisplay, classification_report, fbeta_score, roc_auc_score, \
+    average_precision_score, roc_curve
 from imblearn.pipeline import make_pipeline
 from sklearn.model_selection import StratifiedKFold
 
 OPTUNA_STUDY_NAME = "baseline_lr"
-OPTUNA_N_TRIALS = 100
+OPTUNA_N_TRIALS = 1
 OPTUNA_STORAGE_PATH = "./baseline_optuna_journal_storage.log"
 
 # NLTK related functions
@@ -92,8 +93,8 @@ def train_evaluate(X_train, y_depr_train, model_params):
         pipeline = get_pipeline(model_params)
         pipeline.fit(X_train_fold, y_train_fold)
 
-        predictions = pipeline.predict(X_test_fold)
-        scores.append(fbeta_score(y_test_fold, predictions, beta=2))  # recall twice as important as precision
+        predictions = pipeline.predict_proba(X_test_fold)[:, 1]
+        scores.append(roc_auc_score(y_test_fold, predictions))
 
     return np.mean(scores)
 
@@ -145,6 +146,7 @@ def main():
 
     pipeline.fit(X_train, y_depr_train)
 
+    # prediction w/o Youden index threshold
     # evaluate on dev set
     y_depr_pred = pipeline.predict(X_dev)
 
@@ -157,6 +159,15 @@ def main():
     # print confusion matrix
     ConfusionMatrixDisplay.from_estimator(pipeline, X_dev, y_depr_dev)
     plt.show()
+
+    # prediction w Youden index threshold
+    # evaluate on dev set
+    y_depr_pred = pipeline.predict_proba(X_dev)[:, 1]
+
+    # Compute Youden index threshold
+    fpr, tpr, thresholds = roc_curve(y_depr_dev, y_depr_pred)
+    best_threshold = thresholds[np.argmax(tpr - fpr)]
+    print("Best threshold:", best_threshold)
 
 
 if __name__ == "__main__":
