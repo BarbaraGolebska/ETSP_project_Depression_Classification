@@ -16,10 +16,17 @@ from imblearn.pipeline import make_pipeline
 from sklearn.model_selection import StratifiedKFold
 
 OPTUNA_STUDY_NAME = "baseline_lr"
-OPTUNA_N_TRIALS = 1
+OPTUNA_N_TRIALS = 20
 OPTUNA_STORAGE_PATH = "./baseline_optuna_journal_storage.log"
 
 # NLTK related functions
+
+from pathlib import Path
+import nltk
+
+NLTK_DIR = Path("../data/nltk_data")
+NLTK_DIR.mkdir(parents=True, exist_ok=True)
+nltk.data.path.append(str(NLTK_DIR))
 
 def get_wordnet_pos(tag):
     if tag.startswith('J'):
@@ -99,6 +106,27 @@ def train_evaluate(X_train, y_depr_train, model_params):
     return np.mean(scores)
 
 
+def get_thresholded_predictions(probs, threshold):
+    return (probs >= threshold).astype(int)
+
+
+def get_J_threshold(y_true, y_probs):
+    fpr, tpr, thresholds = roc_curve(y_true, y_probs)
+    j = tpr - fpr
+    idx = np.argmax(j[1:]) + 1 # thresholds[0] corresponds to (0,0) point -> inf
+    best_threshold = thresholds[idx]
+    best_j = j[idx]
+
+    return best_threshold, best_j
+
+def evaluate_with_J_threshold(pipeline, X_dev, y_depr_dev):
+    y_probs = pipeline.predict_proba(X_dev)[:, 1]
+    best_threshold, best_j = get_J_threshold(y_depr_dev, y_probs)
+    y_depr_pred = get_thresholded_predictions(y_probs, best_threshold)
+
+    return y_depr_pred, best_threshold, best_j
+
+
 # optuna related functions
 
 def get_optuna_storage():
@@ -146,29 +174,20 @@ def main():
 
     pipeline.fit(X_train, y_depr_train)
 
-    # prediction w/o Youden index threshold
     # evaluate on dev set
-    y_depr_pred = pipeline.predict(X_dev)
+    y_depr_pred, best_t, best_j = evaluate_with_J_threshold(pipeline, X_dev, y_depr_dev)
 
-    report_dict = classification_report(y_depr_dev, y_depr_pred, output_dict=True, zero_division=0)
-    report_df = pd.DataFrame(report_dict).transpose()
-
-    print("Classification report on dev set:")
-    print(report_df)
-
-    # print confusion matrix
-    ConfusionMatrixDisplay.from_estimator(pipeline, X_dev, y_depr_dev)
-    plt.show()
-
-    # prediction w Youden index threshold
-    # evaluate on dev set
-    y_depr_pred = pipeline.predict_proba(X_dev)[:, 1]
-
-    # Compute Youden index threshold
-    fpr, tpr, thresholds = roc_curve(y_depr_dev, y_depr_pred)
-    best_threshold = thresholds[np.argmax(tpr - fpr)]
-    print("Best threshold:", best_threshold)
-
+    # save results
+    results_dir = Path("./results")
+    results_dir.mkdir(parents=True, exist_ok=True)
+    with open(results_dir / "baseline_lr_results.txt", "w") as f:
+        f.write(f"Best hyperparameters: {study.best_trial.params}\n")
+        f.write(f"Best J statistic on dev set: {best_j} at threshold {best_t}\n")
+        f.write("\nClassification Report:\n")
+        f.write(classification_report(y_depr_dev, y_depr_pred))
+        ConfusionMatrixDisplay.from_predictions(y_depr_dev, y_depr_pred)
+        plt.savefig(results_dir / "baseline_lr_confusion_matrix.png")
+        print(f"Results saved to {results_dir}")
 
 if __name__ == "__main__":
     main()
