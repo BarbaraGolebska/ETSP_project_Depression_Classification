@@ -34,7 +34,10 @@ def suggest_params(trial, model_type):
             "gamma": trial.suggest_float("gamma", 0, 5),
             "min_child_weight": trial.suggest_int("min_child_weight", 1, 10),
             "reg_lambda": trial.suggest_float("reg_lambda", 0.1, 10.0, log=True),
-            "eval_metric": "logloss", "n_jobs": -1, "random_state": 42
+            "eval_metric": "logloss", "n_jobs": -1, "random_state": 42,
+
+            "tree_method":"hist", "device":"cuda"
+
         }
     elif model_type == "lgbm":
         return {
@@ -43,7 +46,11 @@ def suggest_params(trial, model_type):
             "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.3),
             "n_estimators": trial.suggest_int("n_estimators", 50, 300),
             "reg_lambda": trial.suggest_float("reg_lambda", 0.0, 1.0),
-            "random_state": 42, "n_jobs": -1, "verbosity": -1 # verbosity=-1 is silence for LGBM
+            "random_state": 42, "n_jobs": -1, "verbosity": -1, # verbosity=-1 is silence for LGBM
+
+            "device": "gpu",
+            "gpu_platform_id": 0,
+            "gpu_device_id" : 0            
         }
     elif model_type == "cat":
         return {
@@ -53,7 +60,10 @@ def suggest_params(trial, model_type):
             "l2_leaf_reg": trial.suggest_float("l2_leaf_reg", 1.0, 10.0, log=True),
             "border_count": trial.suggest_int("border_count", 5, 25),
             "verbose": 0, # Use verbose=0 for silence during Optuna evaluation
-            "random_state": 42
+            "random_state": 42,
+            
+            "task_type":"GPU",
+            "devices":'0'
         }
 
 
@@ -114,7 +124,7 @@ ftypes = {
 oversampling_methods = ["RandomOverSampler", "SMOTE", "BorderlineSMOTE"]
 #oversampling_methods = ["None"]
 #MODELS_TO_RUN = ["rf", "xgb", "lgbm", "cat"] 
-MODELS_TO_RUN = ["cat"] 
+MODELS_TO_RUN = ["xgb"] 
 
 def main():
     utils.set_seed(1)
