@@ -15,3 +15,6 @@ data/
 # System-generated hidden files
 .DS_Store
 .ipynb_checkpoints/
+
+# CatBoost info
+catboost_info/

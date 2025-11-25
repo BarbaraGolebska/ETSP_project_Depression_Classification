@@ -1,27 +1,42 @@
 from pathlib import Path
 import numpy as np
+import torch
 import optuna
 from imblearn.under_sampling import RandomUnderSampler
-from joblib import Parallel, delayed
-from nltk import sent_tokenize
-from sklearn.metrics import classification_report, ConfusionMatrixDisplay, roc_auc_score
+from sklearn.metrics import classification_report, ConfusionMatrixDisplay, roc_auc_score, roc_curve
 from sklearn.model_selection import StratifiedKFold
 from sklearn.neural_network import MLPClassifier
-from sklearn.preprocessing import FunctionTransformer
 import pandas as pd
-from deepmultilingualpunctuation import PunctuationModel
-from sentence_transformers import SentenceTransformer
 from catboost import CatBoostClassifier
 from imblearn.pipeline import make_pipeline
+from tqdm import tqdm
+
+# module tokenizer handles downloading of NLTK resources
+from tokenizer import nltk_sentence_tokenize as sent_tokenize
+
+tqdm.pandas() # add progress_apply to pandas to show progress bars
 
 RESULTS_DIR = "./results"
 
-OPTUNA_N_TRIALS = 100
+OPTUNA_N_TRIALS = 50
 OPTUNA_STORAGE_PATH = "./embeddings-based_optuna_journal_storage.log"
+# deterministic pruner (median over previous trials)
+OPTUNA_PRUNER = optuna.pruners.MedianPruner(
+    n_warmup_steps=1,   # don't prune before at least 1 reported step
+    n_min_trials=8      # wait for at least 8 completed trials
+)
 
-PUNCTUATION_MODEL = PunctuationModel()
-MPNET_MODEL = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
+# device selection for heavy models
+if torch.cuda.is_available(): DEVICE = 'cuda'
+elif torch.backends.mps.is_available(): DEVICE = 'mps'
+else: DEVICE = 'cpu'
 
+# set random seeds for reproducibility
+import random
+SEED = 42
+random.seed(SEED)
+np.random.seed(SEED)
+torch.manual_seed(SEED)
 
 # dataset related functions
 
@@ -38,43 +53,51 @@ def split(df):
 
 
 def extract(df):
-    return df["text"], df["target_depr"]
+    return np.vstack(df["embedding"].to_numpy()), df["target_depr"].astype(int).to_numpy()
 
 
-# model related functions
+# preprocessing and embedding related functions
+
+def get_punctuation_model():
+    print("INFO: Loading punctuation model...")
+    from punctuationmodel import PunctuationModel
+    return PunctuationModel(device=DEVICE)
+
+
+def get_embedding_model():
+    print("INFO: Loading embedding model...")
+    from sentence_transformers import SentenceTransformer
+    return SentenceTransformer('sentence-transformers/all-mpnet-base-v2', device=DEVICE)
+
+
+def build_embeddings(df, text_col="text", emb_col="embedding"):
+    tqdm.pandas(desc="INFO: Building embeddings")
+    punctuation_model = get_punctuation_model()
+    embedding_model = get_embedding_model()
+    @torch.inference_mode() # turn off gradients to speed up inference
+    def _preprocess_text(text):
+        punc_text = punctuation_model.restore_punctuation(text)
+        sentences = sent_tokenize(punc_text)
+        embeddings = embedding_model.encode(sentences, convert_to_tensor=True)
+        return embeddings.mean(dim=0).cpu().numpy() # mean pooling
+
+    result_df = df.copy()
+    result_df[emb_col] = result_df[text_col].astype(str).progress_apply(lambda s: _preprocess_text(s))
+
+    return result_df
+
+
+# pipeline
 
 def get_pipeline(model_params, model_name):
-    punctuation_transformer = FunctionTransformer(lambda docs: docs.apply(PUNCTUATION_MODEL.restore_punctuation))
-    sentence_splitter_transformer = FunctionTransformer(lambda docs: docs.apply(sent_tokenize))
-    sentence_embedding_transformer = FunctionTransformer(lambda docs: docs.apply(MPNET_MODEL.encode))
-    mean_pooling_transformer = FunctionTransformer(lambda docs: docs.apply(lambda x: np.mean(x, axis=0)))
-    to_matrix_transformer = FunctionTransformer(np.vstack)
-    undersampler = RandomUnderSampler(random_state=42)
+    undersampler = RandomUnderSampler(random_state=SEED)
 
     if model_name=="CatBoost":
-        model = CatBoostClassifier(verbose=0, random_state=42, **model_params)
+        model = CatBoostClassifier(verbose=0, random_state=SEED, **model_params)
     elif model_name=="MLP":
-        model = MLPClassifier(random_state=42, max_iter=500, **model_params)
+        model = MLPClassifier(random_state=SEED, max_iter=3000, **model_params)
 
-    return make_pipeline(punctuation_transformer, sentence_splitter_transformer, sentence_embedding_transformer,
-                         mean_pooling_transformer, to_matrix_transformer, undersampler, model)
-
-
-def train_evaluate(X_train, y_depr_train, model_params, model_name):
-    scores = []
-
-    cv = StratifiedKFold(n_splits=3, shuffle=True, random_state=42)
-    for train_index, test_index in cv.split(X_train, y_depr_train):
-        X_train_fold, X_test_fold = X_train.iloc[train_index], X_train.iloc[test_index]
-        y_train_fold, y_test_fold = y_depr_train.iloc[train_index], y_depr_train.iloc[test_index]
-
-        pipeline = get_pipeline(model_params, model_name)
-        pipeline.fit(X_train_fold, y_train_fold)
-
-        predictions = pipeline.predict_proba(X_test_fold)[:, 1]
-        scores.append(roc_auc_score(y_test_fold, predictions))
-
-    return np.mean(scores)
+    return make_pipeline(undersampler, model)
 
 
 # optuna related functions
@@ -86,7 +109,7 @@ def get_optuna_storage():
     return storage
 
 
-def objective(trial, X_train, y_depr_train, model_name):
+def get_model_params(trial, model_name):
     if model_name == "CatBoost":
         model_params = {
             "l2_leaf_reg": trial.suggest_float("l2_leaf_reg", 1e-2, 10.0, log=True),
@@ -101,7 +124,7 @@ def objective(trial, X_train, y_depr_train, model_name):
         if model_params["bootstrap_type"] == "Bayesian":
             model_params["bagging_temperature"] = trial.suggest_float("bagging_temperature", 0, 10)
         elif model_params["bootstrap_type"] == "Bernoulli":
-            model_params["subsample"] = trial.suggest_float("subsample", 0.1, 1)
+            model_params["subsample"] = trial.suggest_float("subsample", 0.3, 1)
     elif model_name == "MLP":
         n_layers = trial.suggest_int('n_layers', 1, 4)
         layers = []
@@ -126,60 +149,184 @@ def objective(trial, X_train, y_depr_train, model_name):
     # store the cleaned params on the trial
     trial.set_user_attr("model_params", model_params)
 
-    return train_evaluate(X_train, y_depr_train, model_params, model_name)
+    return model_params
 
 
-def run_optimization(X_train, y_depr_train, optuna_study_name, model_name):
-    study = optuna.load_study(study_name=optuna_study_name, storage=get_optuna_storage())
-    study.optimize(lambda trial: objective(trial, X_train, y_depr_train, model_name), n_trials=1)
+def optimize_hyperparameters(X, y, model_name):
+    sampler = optuna.samplers.TPESampler(seed=SEED) # for reproducibility
+    study_name = f"embeddings-based_{model_name}"
+    study = optuna.create_study(
+        study_name=study_name,
+        storage=get_optuna_storage(),
+        direction='maximize',
+        sampler=sampler,
+        pruner=OPTUNA_PRUNER,
+        load_if_exists=True
+    )
 
+    def objective(trial):
+        model_params = get_model_params(trial, model_name)
+        pipe = get_pipeline(model_params, model_name)
+        cv = StratifiedKFold(n_splits=3, shuffle=True, random_state=SEED)
+        scores = []
+        for fold_idx, (train_idxs, test_idxs) in enumerate(cv.split(X, y), start=1):
+            pipe.fit(X[train_idxs], y[train_idxs])
+            probs = pipe.predict_proba(X[test_idxs])[:, 1]
+            scores.append(roc_auc_score(y[test_idxs], probs))
+
+            # report partial mean AUC after each fold and allow pruning
+            trial.report(np.mean(scores), step=fold_idx)
+            if trial.should_prune():
+                raise optuna.TrialPruned()
+   
+        return np.mean(scores)
+
+    # sequential execution to preserve reproducibility
+    study.optimize(lambda trial: objective(trial), n_trials=OPTUNA_N_TRIALS)
+    return study
+
+
+# evaluation functions
+
+def thresholded_predictions(pipeline, X, threshold):
+    """Get binary predictions from pipeline probabilities using given threshold."""
+    probs = pipeline.predict_proba(X)[:, 1]
+    return (probs >= threshold).astype(int)
+
+
+def best_threshold(pipeline, X, y):
+    """Find the best threshold maximizing Youden's J statistic on given data."""
+    y_probs = pipeline.predict_proba(X)[:, 1]
+    fpr, tpr, thresholds = roc_curve(y, y_probs)
+    J = tpr - fpr
+    idx = np.argmax(J)
+
+    return thresholds[idx]
+
+def Youden_index(y_true, y_pred):
+    """Compute Youden's J statistic."""
+    from sklearn.metrics import confusion_matrix
+    tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+    sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+    specificity = tn / (tn + fp) if (tn + fp) > 0 else 0.0
+    return sensitivity + specificity - 1.0
+
+
+def evaluate_models(models, X_test, y_test):
+    """Evaluate models on test set and compare them."""
+    from MLstatkit import Delong_test, Bootstrapping
+    metrics = {}
+    for model_name, model_info in models.items():
+        pipeline = model_info["pipeline"]
+        threshold = model_info["threshold"]
+
+        y_probs = pipeline.predict_proba(X_test)[:, 1]
+        y_pred = (y_probs >= threshold).astype(int)
+
+        youden_j = Youden_index(y_test, y_pred)
+        report = classification_report(y_test, y_pred)
+
+        # bootstrap AUCs with 95% CIs
+        auc, auc_cl, auc_cu = Bootstrapping(
+            y_test, y_probs, 'roc_auc',
+            n_bootstraps=5000, random_state=SEED
+        )
+
+        # confusion matrix
+        disp = ConfusionMatrixDisplay.from_predictions(y_test, y_pred)
+
+        metrics[model_name] = {
+            "youden_j": youden_j,
+            "report": report,
+            "y_probs": y_probs,
+            "auc": auc,
+            "auc_cl": auc_cl,
+            "auc_cu": auc_cu,
+            "confusion_matrix": disp
+        }
+
+    # DeLong's test to compare AUCs
+    model_names = list(models.keys())
+    _, p= Delong_test(
+        y_test, metrics[model_names[0]]["y_probs"],
+        metrics[model_names[1]]["y_probs"],
+        return_ci=False, return_auc=False,
+    )
+    metrics["delong_p_value"] = p
+    return metrics
+
+
+def save_results(models, metrics):
+    results_dir = Path(RESULTS_DIR)
+    results_dir.mkdir(parents=True, exist_ok=True)
+
+    with open(results_dir / "embeddings_results.txt", "w") as f:
+        for model_name, model_info in models.items():
+            f.write(f"Embeddings + {model_name}:\n")
+            f.write(f"Best hyperparameters: {model_info['study'].best_trial.params}\n")
+            f.write(f"Best threshold: {model_info['threshold']:.4f}\n")
+            f.write(f"Youden's J statistic: {metrics[model_name]['youden_j']:.4f}\n")
+            f.write("\nClassification Report:\n")
+            f.write(metrics[model_name]['report'])
+            f.write("\n\n")
+
+            # save confusion matrices
+            disp = metrics[model_name]['confusion_matrix']
+            disp.figure_.savefig(results_dir / f"embeddings-based_{model_name}_cm.png")
+
+        # save comparison results
+        f.write("Comparison of embeddings-based models on test set:\n")
+        f.write(f"DeLong p-value = {metrics['delong_p_value']:.4f}\n")
+        for model_name in models.keys():
+            auc = metrics[model_name]['auc']
+            auc_cl = metrics[model_name]['auc_cl']
+            auc_cu = metrics[model_name]['auc_cu']
+            f.write(f"{model_name} AUC = {auc:.4f} (95% CI: {auc_cl:.4f} - {auc_cu:.4f})\n")
+    print(f"INFO: Results saved to {results_dir.resolve()}.")
+
+
+# main function
 
 def main():
     df = load_dataset()
-    train_df, dev_df, test_df = split(df)
+    embeddings_df = build_embeddings(df, text_col="text", emb_col="embedding")
+    print("INFO: Embeddings built.")
+
+    train_df, dev_df, test_df = split(embeddings_df)
     X_train, y_train = extract(train_df)
     X_dev, y_dev = extract(dev_df)
+    X_test, y_test = extract(test_df)
 
-    # evaluate two models
-
+    # find best models
     model_names = ["MLP", "CatBoost"]
+    models = {}
     for model_name in model_names:
 
         # run hyperparameter optimization
-        study_name = f"embeddings-based_{model_name}"
-
-        optuna.create_study(study_name=study_name, storage=get_optuna_storage(), direction='maximize', load_if_exists=True)
-
-        Parallel(n_jobs=1, backend='multiprocessing')(
-            delayed(run_optimization)(X_train, y_train, study_name, model_name)
-            for _ in range(OPTUNA_N_TRIALS)
-        )
-
-        # get the results from hyperparameter optimization
-        study = optuna.load_study(study_name=study_name, storage=get_optuna_storage())
+        study = optimize_hyperparameters(X_train, y_train, model_name)
+        print(f"INFO: Hyperparameter optimization for {model_name} completed.")
 
         # get the pipeline wth the chosen parameters
         best_params = study.best_trial.user_attrs["model_params"]
         pipeline = get_pipeline(best_params, model_name)
 
+        # fit on the full training set and find best threshold on dev set
         pipeline.fit(X_train, y_train)
-        y_pred = pipeline.predict(X_dev)
+        threshold = best_threshold(pipeline, X_dev, y_dev)
 
-        # save results
-        results_dir = Path(RESULTS_DIR)
-        results_dir.mkdir(parents=True, exist_ok=True)
-
-        with open(results_dir / f"{study_name}_results.txt", "w") as f:
-            f.write(f"Embeddings + {model_name}:\n")
-            f.write(f"Best hyperparameters: {study.best_trial.params}\n")
-            f.write("\nClassification Report:\n")
-            f.write(classification_report(y_dev, y_pred))
-            f.write("\n\n")
-
-        # save confusion matrices
-        disp = ConfusionMatrixDisplay.from_predictions(y_dev, y_pred)
-        disp.figure_.savefig(results_dir / f"embeddings-based_{model_name}_cm.png")
-
+        models[model_name] = {
+            "study": study,
+            "pipeline": pipeline,
+            "threshold": threshold,
+            "best_params": best_params,
+        }
+        
+    # evaluate and save results
+    print("INFO: Evaluating models on test set...")
+    metrics = evaluate_models(models, X_test, y_test)
+    
+    # save results
+    save_results(models, metrics)
 
 if __name__ == "__main__":
     main()

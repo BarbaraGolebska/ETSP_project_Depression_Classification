@@ -7,14 +7,17 @@ import nltk
 from nltk import pos_tag
 from nltk.corpus import wordnet
 from nltk.stem import WordNetLemmatizer
+from nltk import sent_tokenize
 
-__all__ = ["init_nltk", "nltk_preprocess"]
+__all__ = ["init_nltk", "nltk_preprocess", "nltk_sentence_tokenize"]
 
 _DEFAULT_NLTK_DIR = Path("../data/nltk_data")
 _TAGGER_CANDIDATES = ("averaged_perceptron_tagger_eng", "averaged_perceptron_tagger")
 _REQUIRED_CORPORA = {
     "wordnet": "corpora/wordnet",
     "omw-1.4": "corpora/omw-1.4",
+    "punkt": "tokenizers/punkt",
+    "punkt_tab": "tokenizers/punkt_tab",
 }
 _READY = False # whether NLTK is initialized
 _log = logging.getLogger("tokenizer")
@@ -95,3 +98,19 @@ def nltk_preprocess(text, nltk_dir = _DEFAULT_NLTK_DIR):
     tags = pos_tag(words)
     lemmatizer = WordNetLemmatizer()
     return [lemmatizer.lemmatize(w, _get_wordnet_pos(t)) for w, t in tags]
+
+
+def nltk_sentence_tokenize(text, nltk_dir = _DEFAULT_NLTK_DIR):
+    """
+    Tokenize text into sentences using NLTK.
+    :param text: input text
+    :param nltk_dir: NLTK data directory
+    :return: list of sentences
+    """
+    if not isinstance(text, str) or not text:
+        return []
+
+    if not _READY:
+        init_nltk(nltk_dir)
+
+    return sent_tokenize(text)
