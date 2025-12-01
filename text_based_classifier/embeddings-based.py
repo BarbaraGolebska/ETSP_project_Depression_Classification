@@ -1,8 +1,10 @@
 from pathlib import Path
+import joblib
 import numpy as np
 import torch
 import optuna
 from imblearn.under_sampling import RandomUnderSampler
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, ConfusionMatrixDisplay, roc_auc_score, roc_curve
 from sklearn.model_selection import StratifiedKFold
 from sklearn.neural_network import MLPClassifier
@@ -18,7 +20,7 @@ tqdm.pandas() # add progress_apply to pandas to show progress bars
 
 RESULTS_DIR = "./results"
 
-OPTUNA_N_TRIALS = 50
+OPTUNA_N_TRIALS = 1000
 OPTUNA_STORAGE_PATH = "./embeddings-based_optuna_journal_storage.log"
 # deterministic pruner (median over previous trials)
 OPTUNA_PRUNER = optuna.pruners.MedianPruner(
@@ -96,6 +98,8 @@ def get_pipeline(model_params, model_name):
         model = CatBoostClassifier(verbose=0, random_state=SEED, **model_params)
     elif model_name=="MLP":
         model = MLPClassifier(random_state=SEED, max_iter=3000, **model_params)
+    elif model_name=="LR":
+        model = LogisticRegression(random_state=SEED, **model_params)
 
     return make_pipeline(undersampler, model)
 
@@ -144,6 +148,11 @@ def get_model_params(trial, model_name):
             "learning_rate_init": trial.suggest_float(
                 "learning_rate_init", 1e-4, 1e-1, log=True
             )
+        }
+    elif model_name == "LR":
+        model_params = {
+            'solver': trial.suggest_categorical('solver', ['lbfgs', 'liblinear', 'newton-cg']),
+            'C': trial.suggest_float("C", 1e-7, 10.0, log=True)
         }
 
     # store the cleaned params on the trial
@@ -274,6 +283,9 @@ def save_results(models, metrics):
             disp = metrics[model_name]['confusion_matrix']
             disp.figure_.savefig(results_dir / f"embeddings-based_{model_name}_cm.png")
 
+            # save models
+            joblib.dump(model_info['pipeline'][1], results_dir / f"embeddings-based_{model_name}.pkl")
+
         # save comparison results
         f.write("Comparison of embeddings-based models on test set:\n")
         f.write(f"DeLong p-value = {metrics['delong_p_value']:.4f}\n")
@@ -298,7 +310,7 @@ def main():
     X_test, y_test = extract(test_df)
 
     # find best models
-    model_names = ["MLP", "CatBoost"]
+    model_names = ["MLP", "CatBoost", "LR"]
     models = {}
     for model_name in model_names:
 
