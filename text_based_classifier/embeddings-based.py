@@ -284,7 +284,7 @@ def save_results(models, metrics):
             disp.figure_.savefig(results_dir / f"embeddings-based_{model_name}_cm.png")
 
             # save models
-            joblib.dump(model_info['pipeline'][1], results_dir / f"embeddings-based_{model_name}.pkl")
+            joblib.dump(model_info['pipeline'], results_dir / f"embeddings-based_{model_name}.pkl")
 
         # save comparison results
         f.write("Comparison of embeddings-based models on test set:\n")
@@ -303,6 +303,8 @@ def main():
     df = load_dataset()
     embeddings_df = build_embeddings(df, text_col="text", emb_col="embedding")
     print("INFO: Embeddings built.")
+    # save embeddings into a file
+    embeddings_df.to_csv("../data/processed/embeddings.csv")
 
     train_df, dev_df, test_df = split(embeddings_df)
     X_train, y_train = extract(train_df)

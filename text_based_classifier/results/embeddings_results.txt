@@ -15,19 +15,19 @@ weighted avg       0.81      0.73      0.74        56
 
 
 Embeddings + CatBoost:
-Best hyperparameters: {'l2_leaf_reg': 7.618061278341876, 'random_strength': 6.702269982159645, 'colsample_bylevel': 0.011332056757827814, 'depth': 1, 'boosting_type': 'Plain', 'bootstrap_type': 'Bayesian', 'bagging_temperature': 9.995242396232712}
-Best threshold: 0.4464
-Youden's J statistic: 0.4540
+Best hyperparameters: {'l2_leaf_reg': 0.3996395775399211, 'random_strength': 6.704026980320866, 'colsample_bylevel': 0.01555434486545058, 'depth': 1, 'boosting_type': 'Plain', 'bootstrap_type': 'Bayesian', 'bagging_temperature': 9.519165161743404}
+Best threshold: 0.4331
+Youden's J statistic: 0.3952
 
 Classification Report:
               precision    recall  f1-score   support
 
-           0       0.95      0.51      0.67        39
-           1       0.46      0.94      0.62        17
+           0       0.91      0.51      0.66        39
+           1       0.44      0.88      0.59        17
 
-    accuracy                           0.64        56
-   macro avg       0.70      0.73      0.64        56
-weighted avg       0.80      0.64      0.65        56
+    accuracy                           0.62        56
+   macro avg       0.68      0.70      0.62        56
+weighted avg       0.77      0.62      0.64        56
 
 
 Embeddings + LR:
@@ -47,7 +47,7 @@ weighted avg       0.79      0.70      0.71        56
 
 
 Comparison of embeddings-based models on test set:
-DeLong p-value = 0.3264
+DeLong p-value = 0.3889
 MLP AUC = 0.8386 (95% CI: 0.7045 - 0.9478)
-CatBoost AUC = 0.7994 (95% CI: 0.6629 - 0.9192)
+CatBoost AUC = 0.8160 (95% CI: 0.6742 - 0.9388)
 LR AUC = 0.8326 (95% CI: 0.6992 - 0.9412)
