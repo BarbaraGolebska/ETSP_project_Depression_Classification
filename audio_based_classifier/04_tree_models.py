@@ -1,6 +1,11 @@
 import optuna
 import pandas as pd
 import numpy as np
+
+import ast
+import joblib
+import os
+
 from sklearn.model_selection import GroupKFold
 from sklearn.ensemble import RandomForestClassifier
 from xgboost import XGBClassifier
@@ -113,18 +118,20 @@ def objective(trial, X, y, groups, kf, oversampler_name, model_type):
 # MAIN
 # =========================
 ftypes = {
-    #"expert_k": "ExpertK_aggregated_features.csv",
-    #"bow": "BoW_aggregated_features.csv",
+    "expert_k": "ExpertK_aggregated_features.csv",
+    "bow": "BoW_aggregated_features.csv",
     "deep_rep": "DeepR_aggregated_features.csv",
-    #"hubert": "hubert_aggregated_embeddings.csv",
-    #"all": "merged_all_features.csv",
-    #"all_incl_hubert": "merged_all_features_hubert.csv"
+    "hubert": "hubert_aggregated_embeddings.csv",
+    "all": "merged_all_features.csv",
+    "all_incl_hubert": "merged_all_features_hubert.csv",
+    "ek_egemaps":"ek_egemaps_aggregated_features.csv",
+    "ek_mfcc":"ek_mfcc_aggregated_features.csv"
 }
 
-oversampling_methods = ["RandomOverSampler", "SMOTE", "BorderlineSMOTE"]
+oversampling_methods = ["None","RandomOverSampler", "SMOTE", "BorderlineSMOTE"]
 #oversampling_methods = ["None"]
 #MODELS_TO_RUN = ["rf", "xgb", "lgbm", "cat"] 
-MODELS_TO_RUN = ["xgb"] 
+MODELS_TO_RUN = ["xgb", "lgbm", "cat"] 
 
 def main():
     utils.set_seed(1)
@@ -208,5 +215,107 @@ def main():
                     save_path="tree_results.csv"
                 ) 
 
+
+def train_best_tree_models(results_csv="tree_results.csv", save_dir="tree_models"):
+    utils.set_seed(1)
+    os.makedirs(save_dir, exist_ok=True)
+
+    # Load the results file
+    results = pd.read_csv(results_csv)
+
+    # Convert string best_params → dict
+    results["best_params"] = results["best_params"].apply(lambda x: ast.literal_eval(x))
+
+    #for model_type in results["Model_Name"].unique():
+    #    for ftype in results["Data"].unique():
+    #        for oversampler in results["Oversampler"].unique():
+
+                # Filter row that matches the combination
+    """
+    row = results[
+        (results["Model_Name"] == model_type) &
+        (results["Data"] == ftype) &
+        (results["Oversampler"] == oversampler)
+    ]
+
+    if row.empty:
+        continue
+    """
+    row = results.iloc[0]   # extract the row
+
+    model_type=row["Model_Name"]
+    ftype=row["Data"]   
+    oversampler=row["Oversampler"]
+
+    print(f"\n======= TRAINING FINAL MODEL: {model_type} | {ftype} | {oversampler} =======")
+
+    best_params = row["best_params"]
+
+    # -------------------------------------------------------
+    # 1. LOAD DATA (TRAIN + TEST)
+    # -------------------------------------------------------
+    X_train, y_train, X_dev, y_dev, df_train, df_dev = utils.load_processed_data(ftypes[ftype])
+    X_test, y_test, df_test = utils.load_test_data(ftypes[ftype])
+
+    # -------------------------------------------------------
+    # 2. OVERSAMPLE FULL TRAINING SET
+    # -------------------------------------------------------
+    sampler = utils.get_oversampler(oversampler)
+    if sampler:
+        X_train_os, y_train_os = sampler.fit_resample(X_train, y_train)
+    else:
+        X_train_os, y_train_os = X_train, y_train
+
+    # -------------------------------------------------------
+    # 3. PREPARE FINAL MODEL
+    # -------------------------------------------------------
+    ModelClass = get_model_class(model_type)
+
+    params = best_params.copy()
+
+    # Add required framework parameters
+    if model_type == "xgb":
+        params.update({"eval_metric": "logloss", "n_jobs": -1})
+    elif model_type == "cat":
+        params.update({"verbose": 0})
+    else:
+        params.update({"n_jobs": -1})
+
+    # Base model
+    base_model = ModelClass(**params)
+
+    # Wrap with calibration
+    final_model = CalibratedClassifierCV(base_model, cv=5, method='isotonic')
+    final_model.fit(X_train_os, y_train_os)
+
+    # -------------------------------------------------------
+    # 4. SAVE MODEL AS .pkl
+    # -------------------------------------------------------
+    model_path = os.path.join(
+        save_dir, 
+        f"{model_type}_{ftype}_{oversampler}_best.pkl"
+    )
+
+    joblib.dump(final_model, model_path)
+    print(f"Saved final trained model → {model_path}")
+
+    # -------------------------------------------------------
+    # 5. EVALUATE ON TEST SET
+    # -------------------------------------------------------
+    utils.evaluate_and_report(
+        final_model,
+        X_test, y_test, df_test,
+        params,
+        model_type,
+        ftype,
+        oversampler,
+        save_path="tree_test_evaluation.csv"
+    )
+
+    print("\n================ TRAINING COMPLETE ================")
+
+
+
 if __name__ == "__main__":
-    main()
+    main() #to run hyperparameter tuning and evaluation
+    #train_best_tree_models() #to train best models and evaluate on test set, based on results csv file

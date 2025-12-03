@@ -38,6 +38,26 @@ def load_processed_data(filename, base_path="data/processed/"):
     
     return X_train, y_train, X_dev, y_dev, df_train, df_dev
 
+def load_test_data(filename, base_path="data/processed/"):
+    df = pd.read_csv(f"{base_path}{filename}")
+    df_train = df[df["split"] == "train"]
+    df_test = df[df["split"] == "test"]   # NEW
+
+    drop_cols = ["participant_id", "target_depr", "target_ptsd", "split"]
+    
+    scaler = StandardScaler()
+    
+    # Fit only on train
+    X_train = scaler.fit_transform(df_train.drop(columns=drop_cols))
+    y_train = df_train["target_depr"].values
+
+
+    X_test = scaler.transform(df_test.drop(columns=drop_cols))
+    y_test = df_test["target_depr"].values
+
+    return (X_test, y_test, df_test)
+
+
 # =========================
 # OVERSAMPLING FACTORY
 # =========================

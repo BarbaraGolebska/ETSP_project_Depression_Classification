@@ -24,12 +24,12 @@ def main():
     for pid in participant_list:
         print(f"Processing patient: {pid}")
         ftypes = {
-            "bow_egemaps": f"{pid}_BoAW_openSMILE_2.3.0_eGeMAPS.csv",
-            "bow_mfcc": f"{pid}_BoAW_openSMILE_2.3.0_MFCC.csv",
+            #"bow_egemaps": f"{pid}_BoAW_openSMILE_2.3.0_eGeMAPS.csv",
+            #"bow_mfcc": f"{pid}_BoAW_openSMILE_2.3.0_MFCC.csv",
             #"densenet201": f"{pid}_densenet201.csv",
             #"vgg16": f"{pid}_vgg16.csv",
             #"ek_egemaps":f"{pid}_OpenSMILE2.3.0_egemaps.csv",
-            #"ek_mfcc":f"{pid}_OpenSMILE2.3.0_mfcc.csv"
+            "ek_mfcc":f"{pid}_OpenSMILE2.3.0_mfcc.csv"
         }
 
         patient_summary = []
@@ -53,7 +53,7 @@ def main():
                                     on="participant_id", how="inner")
     
     data = data.set_index("participant_id")
-    data.to_csv("data/processed/corrected_BoW_aggregated_features.csv")
+    data.to_csv("data/processed/ek_mfcc_aggregated_features.csv")
 
 if __name__ == "__main__":
     main()
