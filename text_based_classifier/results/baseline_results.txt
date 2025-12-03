@@ -1,0 +1,36 @@
+TF-IDF + LR Model:
+Best hyperparameters: {'v_min_df': 2, 'v_ngram_max': 1, 'm_C': 9.90205397710527}
+Best threshold: 0.6188
+Youden's J statistic: 0.1478
+
+Classification Report:
+              precision    recall  f1-score   support
+
+           0       0.74      0.79      0.77        39
+           1       0.43      0.35      0.39        17
+
+    accuracy                           0.66        56
+   macro avg       0.58      0.57      0.58        56
+weighted avg       0.64      0.66      0.65        56
+
+
+NB-weight + LR Model:
+Best hyperparameters: {'v_min_df': 3, 'v_ngram_max': 2, 'm_C': 4.798054665613874, 'nb_alpha': 0.01892577835765127}
+Best threshold: 0.2021
+Youden's J statistic: 0.1478
+
+Classification Report:
+              precision    recall  f1-score   support
+
+           0       0.74      0.79      0.77        39
+           1       0.43      0.35      0.39        17
+
+    accuracy                           0.66        56
+   macro avg       0.58      0.57      0.58        56
+weighted avg       0.64      0.66      0.65        56
+
+
+Comparison of TF-IDF and NB-weight models on test set:
+DeLong p-value = 0.9492
+TF-IDF AUC = 0.6531 (95% CI: 0.4830 - 0.8041)
+NB-weight AUC = 0.6471 (95% CI: 0.4861 - 0.7966)

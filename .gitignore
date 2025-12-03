@@ -10,6 +10,11 @@ venv/
 .env
 
 # Dataset folder (do not commit!)
-data/raw/
-data/processed/
-data/nltk_data/
+data/
+
+# System-generated hidden files
+.DS_Store
+.ipynb_checkpoints/
+
+# CatBoost info
+catboost_info/
