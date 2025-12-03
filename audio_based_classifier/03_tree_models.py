@@ -6,7 +6,6 @@ from datetime import datetime
 import logging
 
 import optuna
-from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import (
     roc_auc_score, roc_curve, confusion_matrix,
@@ -59,6 +58,7 @@ def train_lightgbm(trial, X_train, y_train, scale_pos_weight):
     model = lgb.train(params, lgb.Dataset(X_train, label=y_train), num_boost_round=200)
     return model, params
 
+
 def train_catboost(trial, X_train, y_train, class_weights):
 
     bootstrap_type = trial.suggest_categorical(
@@ -81,7 +81,6 @@ def train_catboost(trial, X_train, y_train, class_weights):
 
     if bootstrap_type == "Bayesian":
         params["bagging_temperature"] = trial.suggest_float("bagging_temperature", 0, 5)
-
     else:
         params["subsample"] = trial.suggest_float("subsample", 0.5, 1.0)
 
@@ -104,7 +103,6 @@ def train_catboost(trial, X_train, y_train, class_weights):
 def run_experiment(model_type="lightgbm", number_of_trials=20):
 
     oversamplers = {
-        "none_scale_pos_weight": None,
         "random_oversampler": RandomOverSampler(random_state=42),
         "smote": SMOTE(random_state=42),
         "adasyn": ADASYN(random_state=42)
@@ -113,154 +111,151 @@ def run_experiment(model_type="lightgbm", number_of_trials=20):
     root_dir = Path("../data/results")
     root_dir.mkdir(parents=True, exist_ok=True)
 
-    # Load features
-    X = np.load("../data/vectors/X_features.npy")
-    y = np.load("../data/vectors/y_labels.npy")
-    X = impute_nans(X)
+    out_dir = Path("../data/vectors/new")
+
+    X_train = np.load(out_dir / "X_train.npy")
+    y_train = np.load(out_dir / "y_train.npy")
+    X_dev = np.load(out_dir / "X_dev.npy")
+    y_dev = np.load(out_dir / "y_dev.npy")
+    X_test = np.load(out_dir / "X_test.npy")
+    y_test = np.load(out_dir / "y_test.npy")
+
+    X_train = impute_nans(X_train)
+    X_dev = impute_nans(X_dev)
+    X_test = impute_nans(X_test)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     run_dir = root_dir / f"run_{model_type}_{timestamp}"
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    # -------------------------------------------------------
-    # Loop over sampling strategies
-    # -------------------------------------------------------
     for sampler_name, sampler in oversamplers.items():
-        print(f"\n===== Running sampler: {sampler_name} ({model_type}) =====")
+        logging.info(f"\n===== Running sampler: {sampler_name} ({model_type}) =====")
 
-        fold_auc_scores = []
-        fold_results = []
+        X_tr = X_train.copy()
+        y_tr = y_train.copy()
+        X_val = X_dev.copy()
+        y_val = y_dev.copy()
 
-        kf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+        X_tr, X_val, mask = remove_constant_cols_local(X_tr, X_val)
 
-        for fold, (train_idx, val_idx) in enumerate(kf.split(X, y)):
-            print(f" Fold {fold+1}/5")
+        scaler = StandardScaler()
+        X_tr = scaler.fit_transform(X_tr)
+        X_val = scaler.transform(X_val)
 
-            X_train, X_val = X[train_idx], X[val_idx]
-            y_train, y_val = y[train_idx], y[val_idx]
+        if sampler is not None:
+            X_tr, y_tr = sampler.fit_resample(X_tr, y_tr)
+            class_weights = [1.0, 1.0]
+            scale_pos_weight = 1.0
+        else:
+            pos = sum(y_tr == 1)
+            neg = sum(y_tr == 0)
+            scale_pos_weight = neg / pos
+            class_weights = [1.0, scale_pos_weight]
 
-            # Remove constant cols
-            X_train, X_val, mask = remove_constant_cols_local(X_train, X_val)
-
-            # Scale
-            scaler = StandardScaler()
-            X_train = scaler.fit_transform(X_train)
-            X_val = scaler.transform(X_val)
-
-            # Oversampling
-            if sampler is not None:
-                X_train, y_train = sampler.fit_resample(X_train, y_train)
-                class_weights = [1.0, 1.0]
-                scale_pos_weight = 1.0
-            else:
-                pos = sum(y_train == 1)
-                neg = sum(y_train == 0)
-                scale_pos_weight = neg / pos
-                class_weights = [1.0, scale_pos_weight]
-
-            # ----------------------------------------------------
-            #  OPTUNA Objective (shared wrapper)
-            # ----------------------------------------------------
-            def objective(trial):
-                if model_type == "lightgbm":
-                    model, _ = train_lightgbm(trial, X_train, y_train, scale_pos_weight)
-                    preds = model.predict(X_val)
-
-                elif model_type == "catboost":
-                    model, _ = train_catboost(trial, X_train, y_train, class_weights)
-                    preds = model.predict_proba(X_val)[:, 1]
-
-                return roc_auc_score(y_val, preds)
-
-            study = optuna.create_study(direction="maximize")
-            study.optimize(objective, n_trials=number_of_trials)
-
-            best_params = study.best_params
-
-            #train final model with best params
-
+        # ---------------- OPTUNA ----------------
+        def objective(trial):
             if model_type == "lightgbm":
-                best_params.update({
-                    "objective": "binary",
-                    "metric": "auc",
-                    "verbosity": -1,
-                    "boosting_type": "gbdt",
-                    "scale_pos_weight": scale_pos_weight
-                })
-                final_model = lgb.train(best_params, lgb.Dataset(X_train, label=y_train), num_boost_round=300)
-                val_preds = final_model.predict(X_val)
+                model, _ = train_lightgbm(trial, X_tr, y_tr, scale_pos_weight)
+                preds = model.predict(X_val)
+            else:
+                model, _ = train_catboost(trial, X_tr, y_tr, class_weights)
+                preds = model.predict_proba(X_val)[:, 1]
+            return roc_auc_score(y_val, preds)
 
-            else:  # CatBoost
-                best_params.update({
-                    "iterations": 400,
-                    "loss_function": "Logloss",
-                    "eval_metric": "AUC",
-                    "verbose": False,
-                    "class_weights": class_weights,
-                })
-                final_model = CatBoostClassifier(**best_params)
-                final_model.fit(X_train, y_train, verbose=False)
-                val_preds = final_model.predict_proba(X_val)[:, 1]
+        study = optuna.create_study(direction="maximize")
+        study.optimize(objective, n_trials=number_of_trials)
 
-            auc = roc_auc_score(y_val, val_preds)
-            fpr, tpr, thr = roc_curve(y_val, val_preds)
-            youden = tpr - fpr
-            best_idx = np.argmax(youden)
-            best_threshold = thr[best_idx]
-            best_youden = youden[best_idx]
+        best_params = study.best_params
 
-            pred_labels = (val_preds >= best_threshold).astype(int)
-            tn, fp, fn, tp = confusion_matrix(y_val, pred_labels).ravel()
-
-            precision = precision_score(y_val, pred_labels)
-            recall = recall_score(y_val, pred_labels)
-            f1 = f1_score(y_val, pred_labels)
-
-            fold_results.append({
-                "fold": fold,
-                "auc": float(auc),
-                "best_threshold": float(best_threshold),
-                "best_youden": float(best_youden),
-                "confusion": {"tn": int(tn), "fp": int(fp), "fn": int(fn), "tp": int(tp)},
-                "precision": float(precision),
-                "recall": float(recall),
-                "f1": float(f1),
-                "best_params": best_params,
+        # ---------------- FINAL MODEL ----------------
+        if model_type == "lightgbm":
+            best_params.update({
+                "objective": "binary",
+                "metric": "auc",
+                "verbosity": -1,
+                "boosting_type": "gbdt",
+                "scale_pos_weight": scale_pos_weight
             })
+            final_model = lgb.train(best_params, lgb.Dataset(X_tr, label=y_tr), num_boost_round=300)
+            dev_preds = final_model.predict(X_val)
+        else:
+            best_params.update({
+                "iterations": 400,
+                "loss_function": "Logloss",
+                "eval_metric": "AUC",
+                "verbose": False,
+                "class_weights": class_weights,
+            })
+            final_model = CatBoostClassifier(**best_params)
+            final_model.fit(X_tr, y_tr, verbose=False)
+            dev_preds = final_model.predict_proba(X_val)[:, 1]
 
-            fold_auc_scores.append(auc)
+        auc = roc_auc_score(y_val, dev_preds)
+        fpr, tpr, thr = roc_curve(y_val, dev_preds)
+        youden = tpr - fpr
+        best_idx = np.argmax(youden)
+        best_threshold = thr[best_idx]
+        dev_youden = float(youden[best_idx])
 
-            # save fold results
-            fold_dir = run_dir / f"{sampler_name}_fold{fold}"
-            fold_dir.mkdir(parents=True, exist_ok=True)
+        dev_labels = (dev_preds >= best_threshold).astype(int)
+        tn, fp, fn, tp = confusion_matrix(y_val, dev_labels).ravel()
 
-            if model_type == "lightgbm":
-                final_model.save_model(fold_dir / "model_lightgbm.txt")
-            else:
-                final_model.save_model(fold_dir / "model_catboost.cbm")
+        precision = precision_score(y_val, dev_labels)
+        recall = recall_score(y_val, dev_labels)
+        f1 = f1_score(y_val, dev_labels)
 
-            joblib.dump(scaler, fold_dir / "scaler.pkl")
-            np.save(fold_dir / "val_preds.npy", val_preds)
-            np.save(fold_dir / "y_val.npy", y_val)
+        logging.info("----- TEST EVALUATION -----")
+        X_te = X_test[:, mask]
+        X_te = scaler.transform(X_te)
 
-            with open(fold_dir / "metrics.json", "w") as f:
-                json.dump(fold_results[-1], f, indent=4)
+        if model_type == "lightgbm":
+            test_preds = final_model.predict(X_te)
+        else:
+            test_preds = final_model.predict_proba(X_te)[:, 1]
 
-        # save summary
-        summary = {
+        test_labels = (test_preds >= best_threshold).astype(int)
+
+        auc_test = roc_auc_score(y_test, test_preds)
+        tn2, fp2, fn2, tp2 = confusion_matrix(y_test, test_labels).ravel()
+
+        fpr2, tpr2, _ = roc_curve(y_test, test_preds)
+        test_youden = float(max(tpr2 - fpr2))
+
+        precision_test = precision_score(y_test, test_labels)
+        recall_test = recall_score(y_test, test_labels)
+        f1_test = f1_score(y_test, test_labels)
+
+        sampler_dir = run_dir / sampler_name
+        sampler_dir.mkdir(parents=True, exist_ok=True)
+
+        if model_type == "lightgbm":
+            final_model.save_model(sampler_dir / "model_lightgbm.txt")
+        else:
+            final_model.save_model(sampler_dir / "model_catboost.cbm")
+
+        joblib.dump(scaler, sampler_dir / "scaler.pkl")
+        np.save(sampler_dir / "dev_preds.npy", dev_preds)
+        np.save(sampler_dir / "test_preds.npy", test_preds)
+
+        metrics = {
             "sampler": sampler_name,
-            "model_type": model_type,
-            "mean_auc": float(np.mean(fold_auc_scores)),
-            "std_auc": float(np.std(fold_auc_scores)),
-            "folds": fold_results
+            "best_threshold": float(best_threshold),
+
+            "test_auc": float(auc_test),
+            "test_youden": test_youden,
+            "test_confusion": [int(tn2), int(fp2), int(fn2), int(tp2)],
+            "test_precision": float(precision_test),
+            "test_recall": float(recall_test),
+            "test_f1": float(f1_test),
+
+            "best_params": best_params
         }
 
-        with open(run_dir / f"{sampler_name}_summary.json", "w") as f:
-            json.dump(summary, f, indent=4)
+        with open(sampler_dir / "metrics.json", "w") as f:
+            json.dump(metrics, f, indent=4)
 
-    logging.info(f"\nTraining complete for all sampling strategies ({model_type})")
+    logging.info("Training complete")
 
 
 if __name__ == "__main__":
-    # run_experiment(model_type="lightgbm")
-    run_experiment(model_type="catboost")
+    run_experiment(model_type="lightgbm", number_of_trials=1000)
