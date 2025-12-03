@@ -1,0 +1,31 @@
+{
+    "sampler": "smote",
+    "best_threshold": 0.1538803918242334,
+    "test_auc": 0.7104072398190044,
+    "test_youden": 0.44947209653092013,
+    "test_confusion": [
+        16,
+        23,
+        3,
+        14
+    ],
+    "test_precision": 0.3783783783783784,
+    "test_recall": 0.8235294117647058,
+    "test_f1": 0.5185185185185185,
+    "best_params": {
+        "learning_rate": 0.15131018514111838,
+        "num_leaves": 72,
+        "max_depth": 16,
+        "min_data_in_leaf": 100,
+        "feature_fraction": 0.8197415521726795,
+        "bagging_fraction": 0.7746271906983224,
+        "bagging_freq": 9,
+        "lambda_l1": 1.3164687472200457e-05,
+        "lambda_l2": 0.3731590860441706,
+        "objective": "binary",
+        "metric": "auc",
+        "verbosity": -1,
+        "boosting_type": "gbdt",
+        "scale_pos_weight": 1.0
+    }
+}
