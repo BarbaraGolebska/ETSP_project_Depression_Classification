@@ -73,15 +73,3 @@ class PunctuationModel():
             if label in ".,?-:":
                 result += label+" "
         return result.strip()
-
-if __name__ == "__main__":    
-    model = PunctuationModel()
-
-    text = "das , ist fies "
-    # restore add missing punctuation
-    result = model.restore_punctuation(text)
-    print(result)
-
-    clean_text = model.preprocess(text)
-    labled_words = model.predict(clean_text)
-    print(labled_words)
