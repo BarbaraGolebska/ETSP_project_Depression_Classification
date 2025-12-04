@@ -1,0 +1,53 @@
+Embeddings + MLP:
+Best hyperparameters: {'n_layers': 1, 'n_units_l0': 48, 'activation': 'logistic', 'solver': 'adam', 'alpha': 0.057621071214204844, 'learning_rate_init': 0.0031346622799235347}
+Best threshold: 0.5012
+Youden's J statistic: 0.5490
+
+Classification Report:
+              precision    recall  f1-score   support
+
+           0       0.93      0.67      0.78        39
+           1       0.54      0.88      0.67        17
+
+    accuracy                           0.73        56
+   macro avg       0.73      0.77      0.72        56
+weighted avg       0.81      0.73      0.74        56
+
+
+Embeddings + CatBoost:
+Best hyperparameters: {'l2_leaf_reg': 0.3996395775399211, 'random_strength': 6.704026980320866, 'colsample_bylevel': 0.01555434486545058, 'depth': 1, 'boosting_type': 'Plain', 'bootstrap_type': 'Bayesian', 'bagging_temperature': 9.519165161743404}
+Best threshold: 0.4331
+Youden's J statistic: 0.3952
+
+Classification Report:
+              precision    recall  f1-score   support
+
+           0       0.91      0.51      0.66        39
+           1       0.44      0.88      0.59        17
+
+    accuracy                           0.62        56
+   macro avg       0.68      0.70      0.62        56
+weighted avg       0.77      0.62      0.64        56
+
+
+Embeddings + LR:
+Best hyperparameters: {'solver': 'newton-cg', 'C': 9.677419893708189}
+Best threshold: 0.4978
+Youden's J statistic: 0.4977
+
+Classification Report:
+              precision    recall  f1-score   support
+
+           0       0.92      0.62      0.74        39
+           1       0.50      0.88      0.64        17
+
+    accuracy                           0.70        56
+   macro avg       0.71      0.75      0.69        56
+weighted avg       0.79      0.70      0.71        56
+
+
+Comparison of embeddings-based models on test set:
+DeLong p-value = 0.3889
+MLP AUC = 0.8386 (95% CI: 0.7045 - 0.9478)
+CatBoost AUC = 0.8160 (95% CI: 0.6742 - 0.9388)
+LR AUC = 0.8326 (95% CI: 0.6992 - 0.9412)
