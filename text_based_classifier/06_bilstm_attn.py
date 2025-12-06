@@ -5,14 +5,9 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 import optuna
-from imblearn.under_sampling import RandomUnderSampler
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import average_precision_score, classification_report, ConfusionMatrixDisplay, roc_auc_score, roc_curve, confusion_matrix
+from sklearn.metrics import classification_report, ConfusionMatrixDisplay, roc_auc_score, roc_curve
 from sklearn.model_selection import StratifiedKFold
-from sklearn.neural_network import MLPClassifier
 import pandas as pd
-from catboost import CatBoostClassifier
-from imblearn.pipeline import make_pipeline
 from tqdm import tqdm
 
 # module tokenizer handles downloading of NLTK resources
@@ -20,7 +15,7 @@ from tokenizer import nltk_sentence_tokenize as sent_tokenize
 
 RESULTS_DIR = "./results"
 
-OPTUNA_N_TRIALS = 50
+OPTUNA_N_TRIALS = 30
 OPTUNA_STORAGE_PATH = "./bilstm_attn_optuna_journal_storage.log"
 # deterministic pruner (median over previous trials)
 OPTUNA_PRUNER = optuna.pruners.MedianPruner(
@@ -41,9 +36,13 @@ SEED = 42
 random.seed(SEED)
 np.random.seed(SEED)
 torch.manual_seed(SEED)
+if DEVICE == 'cuda':
+    torch.cuda.manual_seed_all(SEED)
 
 # embedding dimension
 EMB_DIM = 768
+# fixed maximum number of training epochs
+MAX_EPOCHS = 12
 
 
 # dataset related functions
@@ -73,16 +72,6 @@ def get_datasets(df):
     X_train, M_train, y_train = extract(train_df)
     X_dev, M_dev, y_dev = extract(dev_df)
     X_test, M_test, y_test = extract(test_df)
-
-    # undersample train to balance classes
-    rus = RandomUnderSampler(random_state=SEED)
-    idx_resampled, y_train = rus.fit_resample(
-        np.arange(len(y_train)).reshape(-1, 1),
-        y_train
-    )
-    idx_resampled = idx_resampled.ravel()
-    X_train = X_train[idx_resampled]
-    M_train = M_train[idx_resampled]
 
     train_ds = DocDataset(X_train, M_train, y_train)
     dev_ds = DocDataset(X_dev, M_dev, y_dev)
@@ -252,9 +241,20 @@ class DocDataset(Dataset):
         M: (N, T_max)     - mask 1/0 (1 = real sentence, 0 = padded ones)
         y: (N,)           - binary labels (0/1)
         """
-        self.X = torch.tensor(X, dtype=torch.float32)
-        self.M = torch.tensor(M, dtype=torch.long)
-        self.y = torch.tensor(y, dtype=torch.float32) # for BCEWithLogitsLoss
+        if isinstance(X, torch.Tensor):
+            self.X = X.to(torch.float32)
+        else:
+            self.X = torch.tensor(X, dtype=torch.float32)
+
+        if isinstance(M, torch.Tensor):
+            self.M = M.to(torch.long)
+        else:
+            self.M = torch.tensor(M, dtype=torch.long)
+
+        if isinstance(y, torch.Tensor):
+            self.y = y.to(torch.float32)
+        else:
+            self.y = torch.tensor(y, dtype=torch.float32)  # for BCEWithLogitsLoss
 
     def __len__(self):
         return len(self.X)
@@ -267,9 +267,8 @@ class DocDataset(Dataset):
 
 def get_pos_weights(y):
     """Calculate positive class weight for imbalanced binary classification."""
-    y_np = y.numpy()
-    n_neg = np.sum(y_np == 0)
-    n_pos = np.sum(y_np == 1)
+    n_neg = np.sum(y == 0)
+    n_pos = np.sum(y == 1)
     pos_weight_value = n_neg / n_pos
     pos_weight = torch.tensor([pos_weight_value], dtype=torch.float32, device=DEVICE)
     return pos_weight
@@ -287,17 +286,16 @@ def get_optuna_storage():
 def get_params(trial, model_name):
     # shared hyperparameters
     params = {
-        "dropout":      trial.suggest_float("dropout", 0.1, 0.5),
-        "attn_hidden":  trial.suggest_categorical("attn_hidden", [64, 128, 256]),
-        "lr":           trial.suggest_float("lr", 1e-4, 5e-3, log=True),
-        "weight_decay": trial.suggest_float("weight_decay", 1e-6, 1e-3, log=True),
-        "batch_size":   trial.suggest_categorical("batch_size", [8, 16, 32]),
-        "max_epochs":   trial.suggest_int("max_epochs", 8, 20),
+        "dropout":      trial.suggest_categorical("dropout", [0.1, 0.3, 0.5]),
+        "attn_hidden":  trial.suggest_categorical("attn_hidden", [64, 128]),
+        "lr":           trial.suggest_float("lr", 1e-4, 2e-3, log=True),
+        "weight_decay": trial.suggest_float("weight_decay", 1e-6, 3e-4, log=True),
+        "batch_size":   trial.suggest_categorical("batch_size", [8, 16, 32])
     }
 
     # model-specific hyperparameters
     if model_name == "BiLSTMAttn":
-        params["hidden_size"] = trial.suggest_categorical("hidden_size", [64, 128, 256])
+        params["hidden_size"] = trial.suggest_categorical("hidden_size", [64, 128])
     
     return params
 
@@ -322,7 +320,7 @@ def get_model(model_name, params):
     return model
 
 
-def optimize_hyperparameters(train_ds, dev_ds, model_name):
+def optimize_hyperparameters(X, M, y, model_name):
     sampler = optuna.samplers.TPESampler(seed=SEED) # for reproducibility
     study_name = f"bilstm_attn_{model_name}"
     study = optuna.create_study(
@@ -336,30 +334,41 @@ def optimize_hyperparameters(train_ds, dev_ds, model_name):
 
     def objective(trial):
         params = get_params(trial, model_name)
-        model = get_model(model_name, params)
+        cv = StratifiedKFold(n_splits=3, shuffle=True, random_state=SEED)
+        scores = []
+        for fold_idx, (train_idxs, test_idxs) in enumerate(cv.split(X, y), start=1):
+            model = get_model(model_name, params)
 
-        # data loaders
-        train_loader = DataLoader(train_ds, batch_size=params["batch_size"], shuffle=True)
-        dev_loader = DataLoader(dev_ds, batch_size=params["batch_size"], shuffle=False)
+            train_loader = DataLoader(
+                DocDataset(X[train_idxs], M[train_idxs], y[train_idxs]),
+                batch_size=params["batch_size"],
+                shuffle=True
+            )
+            val_loader = DataLoader(
+                DocDataset(X[test_idxs], M[test_idxs], y[test_idxs]),
+                batch_size=params["batch_size"],
+                shuffle=False
+            )
 
-        # loss function and optimizer
-        criterion = nn.BCEWithLogitsLoss() #pos_weight=get_pos_weights(train_ds.y))
-        optimizer = torch.optim.AdamW(model.parameters(), lr=params["lr"], weight_decay=params["weight_decay"])
+            criterion = nn.BCEWithLogitsLoss(pos_weight=get_pos_weights(y[test_idxs]))
+            optimizer = torch.optim.AdamW(
+                model.parameters(), 
+                lr=params["lr"], 
+                weight_decay=params["weight_decay"]
+            )
 
-        best_dev_auc = 0.0
-        for epoch in range(1, params["max_epochs"] + 1):
-            train_loss = train(model, train_loader, optimizer, criterion)
-            dev_loss, dev_auc = eval_model(model, dev_loader, criterion)
+            for _ in range(1, MAX_EPOCHS + 1):
+                train(model, train_loader, optimizer, criterion)
+        
+            _, test_auc = eval_model(model, val_loader, criterion)
+            scores.append(test_auc)
 
-            # report intermediate objective value to optuna for pruning
-            trial.report(dev_auc, step=epoch)
+            # report partial mean AUC after each fold and allow pruning
+            trial.report(np.mean(scores), step=fold_idx)
             if trial.should_prune():
                 raise optuna.TrialPruned()
 
-            if dev_auc > best_dev_auc:
-                best_dev_auc = dev_auc
-
-        return best_dev_auc
+        return np.mean(scores)
 
     # sequential execution to preserve reproducibility
     study.optimize(lambda trial: objective(trial), n_trials=OPTUNA_N_TRIALS)
@@ -453,6 +462,83 @@ def Youden_index(y_true, y_pred):
     return sensitivity + specificity - 1.0
 
 
+def evaluate_test(models):
+    """Evaluate models on test set and compare them."""
+    from MLstatkit import Delong_test, Bootstrapping
+    metrics = {}
+    for model_name, model_info in models.items():
+        model = model_info["model"]
+        threshold = model_info["threshold"]
+        test_loader = model_info["test_loader"]
+
+        y_probs, y_test = predict_probs(model, test_loader)
+        y_pred = (y_probs >= threshold).astype(int)
+
+        youden_j = Youden_index(y_test, y_pred)
+        report = classification_report(y_test, y_pred)
+
+        # bootstrap AUCs with 95% CIs
+        auc, auc_cl, auc_cu = Bootstrapping(
+            y_test, y_probs, 'roc_auc',
+            n_bootstraps=5000, random_state=SEED
+        )
+
+        # confusion matrix
+        disp = ConfusionMatrixDisplay.from_predictions(y_test, y_pred)
+
+        metrics[model_name] = {
+            "youden_j": youden_j,
+            "report": report,
+            "y_probs": y_probs,
+            "auc": auc,
+            "auc_cl": auc_cl,
+            "auc_cu": auc_cu,
+            "confusion_matrix": disp
+        }
+
+    # DeLong's test to compare AUCs
+    model_names = list(models.keys())
+    _, p= Delong_test(
+        y_test, metrics[model_names[0]]["y_probs"],
+        metrics[model_names[1]]["y_probs"],
+        return_ci=False, return_auc=False,
+    )
+    metrics["delong_p_value"] = p
+    return metrics
+
+
+def save_results(models, metrics):
+    results_dir = Path(RESULTS_DIR)
+    results_dir.mkdir(parents=True, exist_ok=True)
+
+    with open(results_dir / "bilstm_attn_results.txt", "w") as f:
+        for model_name, model_info in models.items():
+            f.write(f"{model_name}:\n")
+            f.write(f"Best hyperparameters: {model_info['best_params']}\n")
+            f.write(f"Best threshold: {model_info['threshold']:.4f}\n")
+            f.write(f"Youden's J statistic: {metrics[model_name]['youden_j']:.4f}\n")
+            f.write("\nClassification Report:\n")
+            f.write(metrics[model_name]['report'])
+            f.write("\n\n")
+
+            # save confusion matrices
+            disp = metrics[model_name]['confusion_matrix']
+            disp.figure_.savefig(results_dir / f"bilstm_attn_{model_name}_cm.png")
+
+            # save models
+            joblib.dump(model_info['model'], results_dir / f"bilstm_attn_{model_name}.pkl")
+
+        # save comparison results
+        f.write("Comparison of the models on test set:\n")
+        f.write(f"DeLong p-value = {metrics['delong_p_value']:.4f}\n")
+        for model_name in models.keys():
+            auc = metrics[model_name]['auc']
+            auc_cl = metrics[model_name]['auc_cl']
+            auc_cu = metrics[model_name]['auc_cu']
+            f.write(f"{model_name} AUC = {auc:.4f} (95% CI: {auc_cl:.4f} - {auc_cu:.4f})\n")
+    print(f"INFO: Results saved to {results_dir.resolve()}.")
+
+
 # main function
 
 def main():
@@ -469,6 +555,7 @@ def main():
         print(f"INFO: Embeddings saved to {embeddings_cache.resolve()}.")
 
     train_ds, dev_ds, test_ds = get_datasets(embeddings_df)
+    X_train, M_train, y_train = extract(embeddings_df[embeddings_df.split == "train"])
 
     # find best models
     model_names = ["Attention", "BiLSTMAttn"]
@@ -476,45 +563,40 @@ def main():
     for model_name in model_names:
 
         # run hyperparameter optimization
-        study = optimize_hyperparameters(train_ds, dev_ds, model_name)
+        study = optimize_hyperparameters(X_train, M_train, y_train, model_name)
         print(f"INFO: Hyperparameter optimization for {model_name} completed.")
 
-        # get the model wth the chosen parameters
+        # get the model with the chosen parameters
         best_params = study.best_params
         model = get_model(model_name, best_params)
 
-        # train final model on on the full training set and find best threshold on dev set
-        print(f"INFO: Training final {model_name} model with best hyperparameters...")
-
+        # train final model on the full training set
         batch_size = best_params["batch_size"]
         train_loader, dev_loader, test_loader = get_dataloaders(train_ds, dev_ds, test_ds, batch_size)
-        criterion = nn.BCEWithLogitsLoss() # pos_weight=get_pos_weights(train_ds.y))
+        criterion = nn.BCEWithLogitsLoss(pos_weight=get_pos_weights(y_train))
         optimizer = torch.optim.AdamW(model.parameters(), lr=best_params["lr"], weight_decay=best_params["weight_decay"])
 
-        for epoch in range(1, best_params["max_epochs"] + 1):
-            loss = train(model, train_loader, optimizer, criterion)
-            print(f"INFO: Epoch {epoch}/{best_params['max_epochs']}, Loss: {loss:.4f}")
+        for _ in tqdm(range(1, MAX_EPOCHS + 1), 
+                      desc=f"INFO: Training final {model_name} model"):
+            train(model, train_loader, optimizer, criterion)
         
+        # determine best threshold on dev set
         threshold = best_threshold(model, dev_loader)
-        print(f"INFO: Best threshold on dev set for {model_name}: {threshold:.4f}")
-
-        # print Youden and confusion matrix on dev set
-        y_dev_probs, y_dev_true = predict_probs(model, dev_loader)
-        y_dev_pred = (y_dev_probs >= threshold).astype(int)
-        youden = Youden_index(y_dev_true, y_dev_pred)
-        print(f"INFO: Youden's J on dev set for {model_name}: {youden:.4f}")
-        print(f"INFO: Confusion Matrix on dev set for {model_name}:")
-        print(confusion_matrix(y_dev_true, y_dev_pred))
-        print("INFO: Classification Report on dev set:")
-        print(classification_report(y_dev_true, y_dev_pred))
-
+        
         models[model_name] = {
             "study": study,
             "model": model,
             "threshold": threshold,
             "best_params": best_params,
+            "test_loader": test_loader # for later evaluation
         }
-        
+
+    # evaluate and save results
+    print("INFO: Evaluating models on test set...")
+    metrics = evaluate_test(models)
+    
+    # save results
+    save_results(models, metrics)        
 
 if __name__ == "__main__":
     main()
