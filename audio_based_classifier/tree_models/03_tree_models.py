@@ -6,15 +6,18 @@ from datetime import datetime
 import logging
 
 import optuna
+from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import (
     roc_auc_score, roc_curve, confusion_matrix,
     precision_score, recall_score, f1_score
 )
 from imblearn.over_sampling import RandomOverSampler, SMOTE, ADASYN
+from sklearn.base import BaseEstimator, TransformerMixin
 
 import lightgbm as lgb
 from catboost import CatBoostClassifier
+from audio_based_classifier.tree_models.utils import ModelPipeline
 
 logging.basicConfig(level=logging.INFO)
 
@@ -33,6 +36,7 @@ def impute_nans(X):
     X[idx] = np.take(col_means, np.where(idx)[1])
     return X
 
+    
 ##################################################
 # ---------------- MODEL TRAINERS ----------------
 ##################################################
@@ -128,6 +132,8 @@ def run_experiment(model_type="lightgbm", number_of_trials=20):
     run_dir = root_dir / f"run_{model_type}_{timestamp}"
     run_dir.mkdir(parents=True, exist_ok=True)
 
+    best_youden = 0
+    
     for sampler_name, sampler in oversamplers.items():
         logging.info(f"\n===== Running sampler: {sampler_name} ({model_type}) =====")
 
@@ -137,6 +143,9 @@ def run_experiment(model_type="lightgbm", number_of_trials=20):
         y_val = y_dev.copy()
 
         X_tr, X_val, mask = remove_constant_cols_local(X_tr, X_val)
+        if X_tr.shape[1] == 0:
+            logging.warning("All columns removed after constant-feature filtering. Skipping sampler.")
+            continue
 
         scaler = StandardScaler()
         X_tr = scaler.fit_transform(X_tr)
@@ -218,8 +227,8 @@ def run_experiment(model_type="lightgbm", number_of_trials=20):
         auc_test = roc_auc_score(y_test, test_preds)
         tn2, fp2, fn2, tp2 = confusion_matrix(y_test, test_labels).ravel()
 
-        fpr2, tpr2, _ = roc_curve(y_test, test_preds)
-        test_youden = float(max(tpr2 - fpr2))
+        fpr2, tpr2, _ = roc_curve(y_test, test_labels)
+        test_youden = tp2/(tp2+fn2) + tn2/(fp2+tn2) -1
 
         precision_test = precision_score(y_test, test_labels)
         recall_test = recall_score(y_test, test_labels)
@@ -227,16 +236,7 @@ def run_experiment(model_type="lightgbm", number_of_trials=20):
 
         sampler_dir = run_dir / sampler_name
         sampler_dir.mkdir(parents=True, exist_ok=True)
-
-        if model_type == "lightgbm":
-            final_model.save_model(sampler_dir / "model_lightgbm.txt")
-        else:
-            final_model.save_model(sampler_dir / "model_catboost.cbm")
-
-        joblib.dump(scaler, sampler_dir / "scaler.pkl")
-        np.save(sampler_dir / "dev_preds.npy", dev_preds)
-        np.save(sampler_dir / "test_preds.npy", test_preds)
-
+        best_youden = max(best_youden, test_youden)
         metrics = {
             "sampler": sampler_name,
             "best_threshold": float(best_threshold),
@@ -253,9 +253,24 @@ def run_experiment(model_type="lightgbm", number_of_trials=20):
 
         with open(sampler_dir / "metrics.json", "w") as f:
             json.dump(metrics, f, indent=4)
+            
+
+        if model_type == "lightgbm":
+            final_model.save_model(sampler_dir / "model_lightgbm.txt")
+        else:
+            final_model.save_model(sampler_dir / "model_catboost.cbm")
+
+        joblib.dump(scaler, sampler_dir / "scaler.pkl")
+        np.save(sampler_dir / "dev_preds.npy", dev_preds)
+        np.save(sampler_dir / "test_preds.npy", test_preds)
 
     logging.info("Training complete")
-
+    
 
 if __name__ == "__main__":
-    run_experiment(model_type="lightgbm", number_of_trials=1000)
+    
+    run_experiment(model_type="lightgbm", number_of_trials=500)
+
+    
+    
+
