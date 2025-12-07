@@ -1,6 +1,7 @@
 import json
 import pickle
 import joblib
+import sys
 from pathlib import Path
 import numpy as np
 import optuna
@@ -8,6 +9,11 @@ import pandas as pd
 import lightgbm as lgb
 from matplotlib import pyplot as plt
 from sklearn.metrics import ConfusionMatrixDisplay, classification_report, roc_auc_score
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.append(str(PROJECT_ROOT))
+
+from audio_based_classifier.tree_models.utils import ModelPipeline
 
 OPTUNA_N_TRIALS = 2000
 OPTUNA_STORAGE_PATH = "./late-fusion_optuna_journal_storage.log"
@@ -65,37 +71,24 @@ def get_text_based_models():
 
 # audio based functions
 
-def get_audio_based_datasets():
+def get_audio_based_datasets(model_name):
+    
     set_names = ["X_train", "y_train", "X_dev", "y_dev", "X_test", "y_test"]
-    sets = []  # actual sets, in the same order as set_names
-    scaler = joblib.load("../audio_based_classifier/results/lightgbm_smoke/scaler.pkl")
-    mask = np.load("../audio_based_classifier/results/lightgbm_smoke/mask.npy")
-    for set_name in set_names:
-        raw = np.load(f"../data/vectors/new/{set_name}.npy")
-        if "y" in set_name:  # skip "y" sets
-            sets.append(raw)
-            continue
-        col_means = np.nanmean(raw, axis=0)
-        idx = np.isnan(raw)
-        raw[idx] = np.take(col_means, np.where(idx)[1])
-        processed = raw[:, mask]
-        processed = scaler.transform(processed)
-        sets.append(processed)
-    return sets  # X_train, y_train, X_dev, y_dev, X_test, y_test
+
+    return [np.load(f"../data/audio/{model_name}/{set_name}.npy") for set_name in set_names]
 
 
 def get_audio_based_models():
     # declaring as lists to be able to add other models later
 
-    model_files = ["../audio_based_classifier/results/lightgbm_smoke/model_lightgbm.txt"]
+    model_files = ["../audio_based_classifier/results/lightgbm_smote_hubert_mfcc_egamps.pkl"]
     # get the names for the models, which would be the stemmed filenames
     model_names = [Path(f).stem for f in model_files]
     # get the models themselves
-    models = [lgb.Booster(model_file=model_file) for model_file in model_files]
+    models = [joblib.load(model_file) for model_file in model_files]
     # get the thresholds for the models
-    with open("../audio_based_classifier/results/lightgbm_smoke/metrics.json") as f:
-        best_threshold = json.load(f)["best_threshold"]
-    thresholds = [best_threshold]
+    thresholds = [model.best_threshold for model in models]
+    
     # combine all three together
     return list(zip(model_names, models, thresholds))
 
@@ -135,22 +128,24 @@ def weighted_vote(predictions, model_weights, final_threshold=0.5):
 
 def main():
     X_train_text, y_train_text, X_dev_text, y_dev_text, X_test_text, y_test_text = get_text_based_datasets()
-    X_train_audio, y_train_audio, X_dev_audio, y_dev_audio, X_test_audio, y_test_audio = get_audio_based_datasets()
+    
+    #for audio since we use a little bit different data it needs to loaded more than once
+    X_train_audio, y_train_audio, X_dev_audio, y_dev_audio, X_test_audio, y_test_audio = get_audio_based_datasets('lightgbm_smote_hubert_mfcc_egamps')
 
-    text_based_models = get_text_based_models()
+    # text_based_models = get_text_based_models()
     audio_based_models = get_audio_based_models()
 
-    predictions_dict_text = get_predictions_dict(text_based_models, X_test_text)
+    # predictions_dict_text = get_predictions_dict(text_based_models, X_test_text)
     predictions_dict_audio = get_predictions_dict(audio_based_models, X_test_audio)
     # unite two dicts
-    predictions_dict = predictions_dict_text | predictions_dict_audio
+    predictions_dict = predictions_dict_audio | predictions_dict_audio
 
     # equal weighting
     model_weights = {
         "embeddings-based_MLP": 1,
         "embeddings-based_CatBoost": 1,
         "embeddings-based_LR": 1,
-        "model_lightgbm": 1,
+        "lightgbm_smote_hubert_mfcc_egamps": 1,
     }
     hard_weighted_predictions, soft_weighted_predictions = weighted_vote(predictions_dict, model_weights)
 
