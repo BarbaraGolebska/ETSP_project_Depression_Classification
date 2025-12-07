@@ -1,0 +1,36 @@
+Attention:
+Best hyperparameters: {'dropout': 0.1, 'attn_hidden': 128, 'lr': 0.0008743708280146601, 'weight_decay': 1.0600546936900071e-06, 'batch_size': 16}
+Best threshold: 0.1246
+Youden's J statistic: 0.2413
+
+Classification Report:
+              precision    recall  f1-score   support
+
+         0.0       0.88      0.36      0.51        39
+         1.0       0.38      0.88      0.53        17
+
+    accuracy                           0.52        56
+   macro avg       0.62      0.62      0.52        56
+weighted avg       0.72      0.52      0.51        56
+
+
+BiLSTMAttn:
+Best hyperparameters: {'dropout': 0.5, 'attn_hidden': 128, 'lr': 0.0004114961554691335, 'weight_decay': 1.978105491238375e-06, 'batch_size': 16, 'hidden_size': 64}
+Best threshold: 0.4939
+Youden's J statistic: 0.4796
+
+Classification Report:
+              precision    recall  f1-score   support
+
+         0.0       0.95      0.54      0.69        39
+         1.0       0.47      0.94      0.63        17
+
+    accuracy                           0.66        56
+   macro avg       0.71      0.74      0.66        56
+weighted avg       0.81      0.66      0.67        56
+
+
+Comparison of the models on test set:
+DeLong p-value = 0.0514
+Attention AUC = 0.6923 (95% CI: 0.5289 - 0.8401)
+BiLSTMAttn AUC = 0.8145 (95% CI: 0.6915 - 0.9184)
