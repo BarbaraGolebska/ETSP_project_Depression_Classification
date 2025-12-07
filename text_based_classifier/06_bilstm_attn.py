@@ -360,8 +360,7 @@ def optimize_hyperparameters(X, M, y, model_name):
             for _ in range(1, MAX_EPOCHS + 1):
                 train(model, train_loader, optimizer, criterion)
         
-            _, test_auc = eval_model(model, val_loader, criterion)
-            scores.append(test_auc)
+            scores.append(eval_model(model, val_loader))
 
             # report partial mean AUC after each fold and allow pruning
             trial.report(np.mean(scores), step=fold_idx)
@@ -380,7 +379,6 @@ def optimize_hyperparameters(X, M, y, model_name):
 def train(model, loader, optimizer, criterion):
     """ Train the model for one epoch. """
     model.train()
-    total_loss, total_examples = 0.0, 0
     for X_b, M_b, y_b in loader:
         X_b = X_b.to(DEVICE)
         M_b = M_b.to(DEVICE)
@@ -392,16 +390,11 @@ def train(model, loader, optimizer, criterion):
         loss.backward()
         optimizer.step()
 
-        total_loss += loss.item() * X_b.size(0)
-        total_examples += X_b.size(0)
-    return total_loss / total_examples
-
 
 @torch.no_grad()
-def eval_model(model, loader, criterion):
-    """ Evaluate the model on the given dataset. Returns loss and AUC. """
+def eval_model(model, loader):
+    """ Evaluate the model on the given dataset. Returns AUC. """
     model.eval()
-    total_loss, total_examples = 0.0, 0
     all_probs, all_targets = [], []
 
     for X_b, M_b, y_b in loader:
@@ -410,12 +403,8 @@ def eval_model(model, loader, criterion):
         y_b = y_b.to(DEVICE)
 
         logits, _, _ = model(X_b, M_b)
-        loss = criterion(logits, y_b)
-
-        total_loss += loss.item() * X_b.size(0)
-        total_examples += X_b.size(0)
-
         probs = torch.sigmoid(logits).cpu().numpy()
+
         all_probs.append(probs)
         all_targets.append(y_b.cpu().numpy())
 
@@ -426,7 +415,7 @@ def eval_model(model, loader, criterion):
         auc = roc_auc_score(all_targets, all_probs)
     except ValueError:
         auc = np.nan
-    return total_loss / total_examples, auc
+    return auc
 
 # evaluation functions
 
