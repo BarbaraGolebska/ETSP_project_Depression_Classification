@@ -132,13 +132,13 @@ def main():
     #for audio since we use a little bit different data it needs to loaded more than once
     X_train_audio, y_train_audio, X_dev_audio, y_dev_audio, X_test_audio, y_test_audio = get_audio_based_datasets('lightgbm_smote_hubert_mfcc_egamps')
 
-    # text_based_models = get_text_based_models()
+    text_based_models = get_text_based_models()
     audio_based_models = get_audio_based_models()
 
-    # predictions_dict_text = get_predictions_dict(text_based_models, X_test_text)
+    predictions_dict_text = get_predictions_dict(text_based_models, X_test_text)
     predictions_dict_audio = get_predictions_dict(audio_based_models, X_test_audio)
     # unite two dicts
-    predictions_dict = predictions_dict_audio | predictions_dict_audio
+    predictions_dict = predictions_dict_text | predictions_dict_audio
 
     # equal weighting
     model_weights = {
@@ -178,7 +178,7 @@ def main():
         sampler=sampler,
         load_if_exists=True
     )
-    study.optimize(lambda trial: objective(trial, y_test_text), n_trials=OPTUNA_N_TRIALS)
+    study.optimize(lambda trial: objective(trial, y_dev_text), n_trials=OPTUNA_N_TRIALS)
 
     best_weights = study.best_params
     print(best_weights)
@@ -186,10 +186,10 @@ def main():
     hard_weighted_predictions, soft_weighted_predictions = weighted_vote(predictions_dict, best_weights)
 
     # get results
-    report = classification_report(y_test_text, hard_weighted_predictions)
+    report = classification_report(y_dev_text, hard_weighted_predictions)
     print(report)
     # confusion matrix
-    disp = ConfusionMatrixDisplay.from_predictions(y_test_text, hard_weighted_predictions)
+    disp = ConfusionMatrixDisplay.from_predictions(y_dev_text, hard_weighted_predictions)
     plt.show()
 
 
