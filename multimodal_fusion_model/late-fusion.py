@@ -3,17 +3,24 @@ import pickle
 import joblib
 import sys
 from pathlib import Path
+from matplotlib.artist import get
 import numpy as np
 import optuna
 import pandas as pd
 import lightgbm as lgb
 from matplotlib import pyplot as plt
+from sklearn.discriminant_analysis import StandardScaler
 from sklearn.metrics import ConfusionMatrixDisplay, classification_report, roc_auc_score
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.append(str(PROJECT_ROOT))
 
+import audio_based_classifier.project_utils as project_utils
+sys.modules["project_utils"] = project_utils
+
+from audio_based_classifier.project_utils import BaselineLinearWrapper
 from audio_based_classifier.tree_models.utils import ModelPipeline
+
 
 OPTUNA_N_TRIALS = 2000
 OPTUNA_STORAGE_PATH = "./late-fusion_optuna_journal_storage.log"
@@ -26,6 +33,11 @@ def get_optuna_storage():
     )
     return storage
 
+def get_optuna_storage_rdb():
+    return optuna.storages.RDBStorage(
+        url="sqlite:///late_fusion_optuna.db",
+        engine_kwargs={"connect_args": {"check_same_thread": False}}
+    )
 
 # text based functions
 
@@ -40,9 +52,8 @@ def split(df):
 def extract(df):
     return np.vstack(df["embedding"].to_numpy()), df["target_depr"].astype(int).to_numpy()
 
-
 def get_text_based_datasets():
-    embeddings_df = pd.read_csv("../data/processed/embeddings.csv", index_col=0,
+    embeddings_df = pd.read_csv("../data/processed/text/embeddings.csv", index_col=0,
                                 converters={"embedding": lambda s:
                                 np.fromstring(s.strip("[]"), sep=" ")})  # make sure embeddings are numpy array
     train_df, dev_df, test_df = split(embeddings_df)
@@ -71,21 +82,50 @@ def get_text_based_models():
 
 # audio based functions
 
-def get_audio_based_datasets(model_name):
+def load_processed_audio_data(df: pd.DataFrame) -> list[pd.DataFrame]:
+
+    df_train = df[df["split"] == "train"]
+    df_dev = df[df["split"] == "dev"]
+    df_test = df[df["split"] == "test"]
+
+    drop_cols = ["participant_id", "target_depr", "target_ptsd", "split"]
+    
+    scaler = StandardScaler()
+    X_train = scaler.fit_transform(df_train.drop(columns=drop_cols))
+    y_train = df_train["target_depr"].values
+
+    X_dev = scaler.transform(df_dev.drop(columns=drop_cols))
+    y_dev = df_dev["target_depr"].values
+    
+    X_test = scaler.transform(df_test.drop(columns=drop_cols))
+    y_test = df_test["target_depr"].values
+    
+    return X_train, y_train, X_dev, y_dev, X_test, y_test
+
+def get_audio_based_datasets_lightgbm(model_name):
     
     set_names = ["X_train", "y_train", "X_dev", "y_dev", "X_test", "y_test"]
 
-    return [np.load(f"../data/audio/{model_name}/{set_name}.npy") for set_name in set_names]
+    return [np.load(f"../data/processed/audio/{model_name}/{set_name}.npy") for set_name in set_names]
 
+def get_audio_based_datasets():
+    embeddings_df = pd.read_csv("../data/processed/audio/hubert/hubert_aggregated_embeddings.csv") 
+    X_train, y_train, X_dev, y_dev, X_test, y_test = load_processed_audio_data(embeddings_df)
+    return X_train, y_train, X_dev, y_dev, X_test, y_test
 
 def get_audio_based_models():
+    
     # declaring as lists to be able to add other models later
 
-    model_files = ["../audio_based_classifier/results/lightgbm_smote_hubert_mfcc_egamps.pkl"]
+    model_files = ["../audio_based_classifier/results/lightgbm_smote_hubert_mfcc_egemaps.pkl","../audio_based_classifier/results/hubert_None_baseline.pkl"]
     # get the names for the models, which would be the stemmed filenames
     model_names = [Path(f).stem for f in model_files]
     # get the models themselves
-    models = [joblib.load(model_file) for model_file in model_files]
+    # models = [joblib.load(model_file) for model_file in model_files]
+    models = []
+    for model_file in model_files:
+        print("Loading:", model_file)
+        models.append(joblib.load(model_file))
     # get the thresholds for the models
     thresholds = [model.best_threshold for model in models]
     
@@ -126,35 +166,54 @@ def weighted_vote(predictions, model_weights, final_threshold=0.5):
     return hard_weighted_predictions, soft_weighted_predictions
 
 
+def log_callback(study, trial):
+    with open("late_fusion_optuna_12_10.log", "a", encoding="utf-8") as f:
+        f.write(
+            f"Trial {trial.number} | Value: {trial.value} | Params: {trial.params}\n"
+        )
+
 def main():
     X_train_text, y_train_text, X_dev_text, y_dev_text, X_test_text, y_test_text = get_text_based_datasets()
     
     #for audio since we use a little bit different data it needs to loaded more than once
-    X_train_audio, y_train_audio, X_dev_audio, y_dev_audio, X_test_audio, y_test_audio = get_audio_based_datasets('lightgbm_smote_hubert_mfcc_egamps')
-
+    X_train_audio_l, y_train_audio_l, X_dev_audio_l, y_dev_audio_l, X_test_audio_l, y_test_audio_l = get_audio_based_datasets_lightgbm('lightgbm_smote_hubert_mfcc_egemaps')
+    X_train_audio, y_train_audio, X_dev_audio, y_dev_audio, X_test_audio, y_test_audio = get_audio_based_datasets()
+    
     text_based_models = get_text_based_models()
-    audio_based_models = get_audio_based_models()
+    audio_based_models_lightgbm = get_audio_based_models()[:1]
+    audio_based_models_logreg = get_audio_based_models()[1:]
 
-    predictions_dict_text = get_predictions_dict(text_based_models, X_test_text)
-    predictions_dict_audio = get_predictions_dict(audio_based_models, X_test_audio)
+    predictions_dict_text = get_predictions_dict(text_based_models, X_dev_text)
+    predictions_dict_audio_lightgbm = get_predictions_dict(audio_based_models_lightgbm, X_dev_audio_l)
+    predictions_dict_audio_logreg = get_predictions_dict(audio_based_models_logreg, X_dev_audio)
     # unite two dicts
-    predictions_dict = predictions_dict_text | predictions_dict_audio
+    predictions_dict_dev = predictions_dict_text | predictions_dict_audio_lightgbm | predictions_dict_audio_logreg
+    
+    predictions_dict_text = get_predictions_dict(text_based_models, X_test_text)
+    predictions_dict_audio_lightgbm = get_predictions_dict(audio_based_models_lightgbm, X_test_audio_l)
+    predictions_dict_audio_logreg = get_predictions_dict(audio_based_models_logreg, X_test_audio)
+    # unite two dicts
+    predictions_dict_test = predictions_dict_text | predictions_dict_audio_lightgbm | predictions_dict_audio_logreg
+    
 
     # equal weighting
     model_weights = {
         "embeddings-based_MLP": 1,
         "embeddings-based_CatBoost": 1,
         "embeddings-based_LR": 1,
-        "lightgbm_smote_hubert_mfcc_egamps": 1,
+        "lightgbm_smote_hubert_mfcc_egemaps": 1,
+        "hubert_None_baseline": 1,
     }
-    hard_weighted_predictions, soft_weighted_predictions = weighted_vote(predictions_dict, model_weights)
+    
+    hard_weighted_predictions, soft_weighted_predictions = weighted_vote(predictions_dict_dev, model_weights)
 
     # get results
-    report = classification_report(y_test_text, hard_weighted_predictions)
+    report = classification_report(y_dev_text, hard_weighted_predictions)
     print(report)
     # confusion matrix
-    disp = ConfusionMatrixDisplay.from_predictions(y_test_text, hard_weighted_predictions)
+    disp = ConfusionMatrixDisplay.from_predictions(y_dev_text, hard_weighted_predictions)
     plt.show()
+    
 
     # use optuna to optimize weighting
 
@@ -163,9 +222,10 @@ def main():
             "embeddings-based_MLP": trial.suggest_float("embeddings-based_MLP", 0, 1),
             "embeddings-based_CatBoost": trial.suggest_float("embeddings-based_CatBoost", 0, 1),
             "embeddings-based_LR": trial.suggest_float("embeddings-based_LR", 0, 1),
-            "model_lightgbm": trial.suggest_float("model_lightgbm", 0, 1),
+            "lightgbm_smote_hubert_mfcc_egemaps": trial.suggest_float("lightgbm_smote_hubert_mfcc_egemaps", 0, 1),
+            "hubert_None_baseline": trial.suggest_float("hubert_None_baseline", 0, 1),
         }
-        _, proba = weighted_vote(predictions_dict, model_weights)
+        _, proba = weighted_vote(predictions_dict_dev, model_weights)
         return roc_auc_score(y_true, proba)
 
 
@@ -173,25 +233,30 @@ def main():
     study_name = f"late-fusion"
     study = optuna.create_study(
         study_name=study_name,
-        storage=get_optuna_storage(),
+        storage=get_optuna_storage_rdb(),
         direction='maximize',
         sampler=sampler,
         load_if_exists=True
     )
-    study.optimize(lambda trial: objective(trial, y_dev_text), n_trials=OPTUNA_N_TRIALS)
+    
+    study.optimize(
+            lambda trial: objective(trial, y_dev_text),
+            n_trials=OPTUNA_N_TRIALS,
+            callbacks=[log_callback]
+        )
 
     best_weights = study.best_params
     print(best_weights)
 
-    hard_weighted_predictions, soft_weighted_predictions = weighted_vote(predictions_dict, best_weights)
+    hard_weighted_predictions, soft_weighted_predictions = weighted_vote(predictions_dict_test, best_weights)
 
     # get results
-    report = classification_report(y_dev_text, hard_weighted_predictions)
+    report = classification_report(y_test_text, hard_weighted_predictions)
     print(report)
     # confusion matrix
-    disp = ConfusionMatrixDisplay.from_predictions(y_dev_text, hard_weighted_predictions)
+    disp = ConfusionMatrixDisplay.from_predictions(y_test_text, hard_weighted_predictions)
     plt.show()
-
 
 if __name__ == "__main__":
     main()
+

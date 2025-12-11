@@ -53,7 +53,7 @@ def main():
                                     on="participant_id", how="inner")
     
     data = data.set_index("participant_id")
-    data.to_csv("data/processed/ek_mfcc_aggregated_features.csv")
+    data.to_csv("data/processed/audio/ek_mfcc/ek_mfcc_aggregated_features.csv")
 
 if __name__ == "__main__":
     main()

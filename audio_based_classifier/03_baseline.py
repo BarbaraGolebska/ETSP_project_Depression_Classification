@@ -5,6 +5,7 @@ import numpy as np
 from sklearn.model_selection import GroupKFold
 from sklearn.metrics import roc_auc_score
 import project_utils as utils
+import joblib
 
 # =========================
 # PYTORCH HELPERS
@@ -93,7 +94,12 @@ ftypes = {
     #"ek_mfcc":"ek_mfcc_aggregated_features.csv"
 }
 
-oversampling_methods = ["None", "RandomOverSampler", "SMOTE", "BorderlineSMOTE"]
+oversampling_methods = [
+                        # "None", 
+                        "RandomOverSampler", 
+                        # "SMOTE", 
+                        # "BorderlineSMOTE"
+                        ]
 #oversampling_methods = ["None"]
 
 
@@ -198,13 +204,13 @@ def train_best_model():
             for _ in range(best["epochs"]):
                 train_epoch(final_model, optimizer, criterion, X_train_t, y_train_t)
 
-            # D. SAVE THE MODEL (.pkl)
-            model_path = f"audio_based_classifier/models/{ftype}_{oversampler_name}_baseline.pkl"
-            torch.save(final_model.state_dict(), model_path)
-            print(f"Saved model to {model_path}")
+            # # D. SAVE THE MODEL (.pkl)
+            # model_path = f"audio_based_classifier/models/{ftype}_{oversampler_name}_baseline.pkl"
+            # torch.save(final_model.state_dict(), model_path)
+            # print(f"Saved model to {model_path}")
 
             # 3. Evaluate on Dev Set
-            utils.evaluate_and_report(
+            auc, best_thr = utils.evaluate_and_report(
                 model=final_model, 
                 X_dev=X_test, 
                 y_dev=y_test, 
@@ -216,6 +222,12 @@ def train_best_model():
                 save_path="test_baseline_results.csv"
             )
 
+            wrapper = utils.BaselineLinearWrapper(final_model.cpu(), best_thr)
+
+            model_path = "../audio_based_classifier/results/hubert_None_baseline.pkl"
+            joblib.dump(wrapper, model_path)
+            print(f"Saved joblib-wrapped baseline to {model_path}")
+
 
 if __name__ == "__main__":
-    main()
+    train_best_model()
