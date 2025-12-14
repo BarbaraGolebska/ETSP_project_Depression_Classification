@@ -1,3 +1,4 @@
+import pickle
 from pathlib import Path
 import joblib
 import numpy as np
@@ -268,6 +269,13 @@ def evaluate_models(models, X_test, y_test):
 def save_results(models, metrics):
     results_dir = Path(RESULTS_DIR)
     results_dir.mkdir(parents=True, exist_ok=True)
+
+    # save best thresholds
+    thresholds_dict = dict()
+    for model_name, model_info in models.items():
+        thresholds_dict["embeddings-based_" + model_name] = float(model_info["threshold"])
+    with open(results_dir / 'embeddings_thresholds.pkl', 'wb') as thresholds_file:
+        pickle.dump(thresholds_dict, thresholds_file)
 
     with open(results_dir / "embeddings_results.txt", "w") as f:
         for model_name, model_info in models.items():

@@ -64,7 +64,7 @@ y_train = np.array(y_train)
 y_dev = np.array(y_dev)
 y_test = np.array(y_test)
 
-out_dir = Path("../data/vectors/new")
+out_dir = Path("../data/processed/audio/lightgbm_smote_hubert_mfcc_egemaps")
 out_dir.mkdir(parents=True, exist_ok=True)
 
 np.save(out_dir / "X_train.npy", X_train)
