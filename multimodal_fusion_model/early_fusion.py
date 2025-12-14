@@ -83,18 +83,13 @@ def objective(trial, device, X_np, y_np, groups, kf, oversampler_name):
 # MAIN FUNCTION
 # =========================
 ftypes = {
-    #"expert_k": "ExpertK_aggregated_features.csv",
-    #"bow": "BoW_aggregated_features.csv",
-    #"deep_rep": "DeepR_aggregated_features.csv",
-    "hubert": "hubert_aggregated_embeddings.csv",
-    #"all": "merged_all_features.csv",
-    #"all_incl_hubert": "merged_all_features_hubert.csv"
-    #"ek_egemaps":"ek_egemaps_aggregated_features.csv",
-    #"ek_mfcc":"ek_mfcc_aggregated_features.csv"
+
+    #"concat_hubert_text": "concat_early_fusion.csv",
+    "concat_hubert_expertk_text": "expertk_hubert_text_concat_early_fusion.csv"
 }
 
 oversampling_methods = ["None", "RandomOverSampler", "SMOTE", "BorderlineSMOTE"]
-#oversampling_methods = ["RandomOverSampler"]
+#oversampling_methods = ["None"]
 
 
 def main():
@@ -154,7 +149,7 @@ def main():
                 model_name="Baseline_Linear",      
                 data=ftype,
                 oversampler=oversampler_name,
-                save_path="800_baseline_results.csv"
+                save_path="early_fusion_results.csv"
             )
 
 def train_best_model():
@@ -190,8 +185,7 @@ def train_best_model():
             y_train_t = torch.tensor(y_train_os, dtype=torch.float32).to(device)
 
             # C. Initialize & Train
-            #best = {'lr': 0.09840764582498135, 'optimizer': 'Adam', 'epochs': 30} #youden 0.51
-            best = {'lr': 0.027161129658907632, 'optimizer': 'Adam', 'epochs': 20} #youden 0.56
+            best = {'lr': 0.09840764582498135, 'optimizer': 'Adam', 'epochs': 30}
             final_model = create_model(X_train_t.shape[1], device)
             optimizer = getattr(torch.optim, best["optimizer"])(final_model.parameters(), lr=best["lr"])
             criterion = nn.BCEWithLogitsLoss()
@@ -219,5 +213,4 @@ def train_best_model():
 
 
 if __name__ == "__main__":
-    #main()
-    train_best_model()
+    main()

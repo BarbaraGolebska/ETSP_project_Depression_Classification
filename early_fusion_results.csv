@@ -1,0 +1,13 @@
+Model_Name,Data,Oversampler,AUC,Youden_Index,Best_Threshold,TN,FP,FN,TP,False_Negative_IDs,best_params
+Baseline_Linear,concat_hubert_text,None,0.7209,0.4748,0.061,24,19,1,11,[448],"{'lr': 0.02379104676109112, 'optimizer': 'Adam', 'epochs': 30}"
+Baseline_Linear,concat_hubert_text,RandomOverSampler,0.7016,0.3605,0.679,37,6,6,6,"[347, 350, 381, 402, 412, 448]","{'lr': 0.0008179499475211679, 'optimizer': 'Adam', 'epochs': 20}"
+Baseline_Linear,concat_hubert_text,SMOTE,0.7229,0.4050,0.216,21,22,1,11,[347],"{'lr': 0.001730370606683101, 'optimizer': 'Adam', 'epochs': 30}"
+Baseline_Linear,concat_hubert_text,BorderlineSMOTE,0.7035,0.3585,0.246,19,24,1,11,[347],"{'lr': 0.0008179499475211679, 'optimizer': 'Adam', 'epochs': 20}"
+Baseline_Linear,concat_hubert_text,None,0.7035,0.4012,0.908,28,15,3,9,"[350, 412, 448]","{'lr': 0.03324272198081779, 'optimizer': 'Adam', 'epochs': 20}"
+Baseline_Linear,concat_hubert_text,RandomOverSampler,0.7074,0.4109,0.553,32,11,4,8,"[347, 350, 381, 412]","{'lr': 0.0024351965016039955, 'optimizer': 'Adam', 'epochs': 10}"
+Baseline_Linear,concat_hubert_text,SMOTE,0.7093,0.4109,0.508,32,11,4,8,"[347, 350, 381, 412]","{'lr': 0.0023860215312224765, 'optimizer': 'Adam', 'epochs': 10}"
+Baseline_Linear,concat_hubert_text,BorderlineSMOTE,0.7035,0.3585,0.246,19,24,1,11,[347],"{'lr': 0.0008179499475211679, 'optimizer': 'Adam', 'epochs': 20}"
+Baseline_Linear,concat_hubert_expertk_text,None,0.6938,0.3605,0.680,37,6,6,6,"[347, 350, 381, 402, 412, 448]","{'lr': 0.002324433859862855, 'optimizer': 'Adam', 'epochs': 10}"
+Baseline_Linear,concat_hubert_expertk_text,RandomOverSampler,0.7016,0.4341,0.539,33,10,4,8,"[347, 350, 381, 412]","{'lr': 0.0028484808944687443, 'optimizer': 'Adam', 'epochs': 10}"
+Baseline_Linear,concat_hubert_expertk_text,SMOTE,0.7287,0.4574,0.528,34,9,4,8,"[347, 350, 381, 412]","{'lr': 0.0026435207985154776, 'optimizer': 'Adam', 'epochs': 10}"
+Baseline_Linear,concat_hubert_expertk_text,BorderlineSMOTE,0.7267,0.4109,0.546,32,11,4,8,"[347, 350, 381, 412]","{'lr': 0.002499602731586396, 'optimizer': 'Adam', 'epochs': 10}"
