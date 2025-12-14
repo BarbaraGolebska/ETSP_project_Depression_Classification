@@ -10,7 +10,9 @@ import pandas as pd
 import lightgbm as lgb
 from matplotlib import pyplot as plt
 from sklearn.discriminant_analysis import StandardScaler
-from sklearn.metrics import ConfusionMatrixDisplay, classification_report, roc_auc_score
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import ConfusionMatrixDisplay, classification_report, roc_auc_score, roc_curve,precision_score, recall_score
+
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.append(str(PROJECT_ROOT))
@@ -136,13 +138,15 @@ def get_audio_based_models():
 
 def get_predictions_dict(models, X):
     predictions_dict = dict()
+    probas_dict = dict()
     for model_tuple in models:
         model_name, model, threshold = model_tuple
         print(model_name, model, threshold)
         probas = model.predict(X)
         predictions = (probas >= threshold).astype(int)
         predictions_dict[model_name] = predictions
-    return predictions_dict
+        probas_dict[model_name] = probas
+    return predictions_dict, probas_dict
 
 # voting functions
 
@@ -172,6 +176,45 @@ def log_callback(study, trial):
             f"Trial {trial.number} | Value: {trial.value} | Params: {trial.params}\n"
         )
 
+def build_meta_X_from_dicts(*probas_dicts, model_order=None, sort_keys=True):
+
+    merged = {}
+    for d in probas_dicts:
+        if d is None:
+            continue
+        merged.update(d)
+
+    if model_order is None:
+        model_order = sorted(merged.keys()) if sort_keys else list(merged.keys())
+    else:
+        missing = [k for k in model_order if k not in merged]
+        if missing:
+            raise KeyError(f"Missing probas for models: {missing}")
+
+    X_meta = np.column_stack([np.asarray(merged[k]).reshape(-1) for k in model_order])
+    return X_meta, model_order
+
+def thresholds_youden_and_fixed(y_true, p):
+
+    y_true = np.asarray(y_true).astype(int).reshape(-1)
+    p = np.asarray(p).reshape(-1)
+
+    fpr, tpr, thr = roc_curve(y_true, p)
+
+    #roc_curve sometimes returns thr[0] = inf; drop non-finite thresholds
+    mask = np.isfinite(thr)
+    fpr, tpr, thr = fpr[mask], tpr[mask], thr[mask]
+
+    j = tpr - fpr
+    best_idx = int(np.argmax(j))
+
+    youden_thr = float(thr[best_idx])
+    youden_j = float(j[best_idx])
+
+    print("best youden ", youden_j)
+    return youden_thr, youden_j
+
+
 def main():
     X_train_text, y_train_text, X_dev_text, y_dev_text, X_test_text, y_test_text = get_text_based_datasets()
     
@@ -183,17 +226,17 @@ def main():
     audio_based_models_lightgbm = get_audio_based_models()[:1]
     audio_based_models_logreg = get_audio_based_models()[1:]
 
-    predictions_dict_text = get_predictions_dict(text_based_models, X_dev_text)
-    predictions_dict_audio_lightgbm = get_predictions_dict(audio_based_models_lightgbm, X_dev_audio_l)
-    predictions_dict_audio_logreg = get_predictions_dict(audio_based_models_logreg, X_dev_audio)
-    # unite two dicts
-    predictions_dict_dev = predictions_dict_text | predictions_dict_audio_lightgbm | predictions_dict_audio_logreg
+    predictions_dict_text_dev, probas_dict_text_dev = get_predictions_dict(text_based_models, X_dev_text)
+    predictions_dict_audio_lightgbm_dev, probas_dict_audio_lightgbm_dev = get_predictions_dict(audio_based_models_lightgbm, X_dev_audio_l)
+    predictions_dict_audio_logreg_dev, probas_dict_audio_logreg_dev = get_predictions_dict(audio_based_models_logreg, X_dev_audio)
+    # unite the 3 di
+    predictions_dict_dev = predictions_dict_text_dev | predictions_dict_audio_lightgbm_dev | predictions_dict_audio_logreg_dev
     
-    predictions_dict_text = get_predictions_dict(text_based_models, X_test_text)
-    predictions_dict_audio_lightgbm = get_predictions_dict(audio_based_models_lightgbm, X_test_audio_l)
-    predictions_dict_audio_logreg = get_predictions_dict(audio_based_models_logreg, X_test_audio)
+    predictions_dict_text_test, probas_dict_text_test = get_predictions_dict(text_based_models, X_test_text)
+    predictions_dict_audio_lightgbm_test, probas_dict_audio_lightgbm_test = get_predictions_dict(audio_based_models_lightgbm, X_test_audio_l)
+    predictions_dict_audio_logreg_test, probas_dict_audio_logreg_test = get_predictions_dict(audio_based_models_logreg, X_test_audio)
     # unite two dicts
-    predictions_dict_test = predictions_dict_text | predictions_dict_audio_lightgbm | predictions_dict_audio_logreg
+    predictions_dict_test = predictions_dict_text_test | predictions_dict_audio_lightgbm_test | predictions_dict_audio_logreg_test
     
 
     # equal weighting
@@ -229,34 +272,99 @@ def main():
         return roc_auc_score(y_true, proba)
 
 
-    sampler = optuna.samplers.TPESampler(seed=42) # for reproducibility
-    study_name = f"late-fusion"
-    study = optuna.create_study(
-        study_name=study_name,
-        storage=get_optuna_storage_rdb(),
-        direction='maximize',
-        sampler=sampler,
-        load_if_exists=True
-    )
+    # sampler = optuna.samplers.TPESampler(seed=42) # for reproducibility
+    # study_name = f"late-fusion"
+    # study = optuna.create_study(
+    #     study_name=study_name,
+    #     storage=get_optuna_storage_rdb(),
+    #     direction='maximize',
+    #     sampler=sampler,
+    #     load_if_exists=True
+    # )
     
-    study.optimize(
-            lambda trial: objective(trial, y_dev_text),
-            n_trials=OPTUNA_N_TRIALS,
-            callbacks=[log_callback]
-        )
+    # study.optimize(
+    #         lambda trial: objective(trial, y_dev_text),
+    #         n_trials=OPTUNA_N_TRIALS,
+    #         callbacks=[log_callback]
+    #     )
 
-    best_weights = study.best_params
-    print(best_weights)
+    # best_weights = study.best_params
+    # print(best_weights)
 
-    hard_weighted_predictions, soft_weighted_predictions = weighted_vote(predictions_dict_test, best_weights)
+    # hard_weighted_predictions, soft_weighted_predictions = weighted_vote(predictions_dict_test, best_weights)
 
-    # get results
-    report = classification_report(y_test_text, hard_weighted_predictions)
-    print(report)
-    # confusion matrix
-    disp = ConfusionMatrixDisplay.from_predictions(y_test_text, hard_weighted_predictions)
+    # # get results
+    # report = classification_report(y_test_text, hard_weighted_predictions)
+    # print(report)
+    # # confusion matrix
+    # disp = ConfusionMatrixDisplay.from_predictions(y_test_text, hard_weighted_predictions)
+    # plt.show()
+    
+    
+    X_meta_dev, model_order = build_meta_X_from_dicts(
+    probas_dict_text_dev,
+    probas_dict_audio_lightgbm_dev,
+    probas_dict_audio_logreg_dev,
+    model_order=None
+)
+
+    y_meta_dev = y_dev_text.astype(int)
+
+    meta_clf = LogisticRegression(
+        solver="liblinear",
+        class_weight="balanced",   
+        max_iter=10000
+    )
+
+    meta_clf.fit(X_meta_dev, y_meta_dev)
+
+    p_meta_dev = meta_clf.predict_proba(X_meta_dev)[:, 1]
+    youden_thr, youden_j = thresholds_youden_and_fixed(y_meta_dev, p_meta_dev)
+    print("DEV Youden thr:", youden_thr, "J:", youden_j)
+
+    # Results using youden to pick threshold
+    yhat_dev_youden = (p_meta_dev >= youden_thr).astype(int)
+    print("\n[DEV] report at Youden threshold")
+    print(classification_report(y_meta_dev, yhat_dev_youden, digits=4))
+    
+    ConfusionMatrixDisplay.from_predictions(y_meta_dev, yhat_dev_youden)
+    plt.title("DEV at Youden threshold")
     plt.show()
 
+    yhat_dev_06 = (p_meta_dev >= 0.6).astype(int)
+    print("\n[DEV] report at threshold 0.6")
+    print(classification_report(y_meta_dev, yhat_dev_06, digits=4))
+
+    ConfusionMatrixDisplay.from_predictions(y_meta_dev, yhat_dev_06)
+    plt.title("DEV at threshold 0.6")
+    plt.show()
+    
+    # ---------- EVALUATION ON TEST ----------
+    X_meta_test, _ = build_meta_X_from_dicts(
+        probas_dict_text_test,
+        probas_dict_audio_lightgbm_test,
+        probas_dict_audio_logreg_test,
+        model_order=model_order  
+    )
+
+    y_meta_test = y_test_text.astype(int)
+    p_meta_test = meta_clf.predict_proba(X_meta_test)[:, 1]
+
+    yhat_test_dev_youden = (p_meta_test >= youden_thr).astype(int)
+    print("\n[TEST] report at DEV Youden threshold")
+    print(classification_report(y_meta_test, yhat_test_dev_youden, digits=4))
+    ConfusionMatrixDisplay.from_predictions(y_meta_test, yhat_test_dev_youden)
+    plt.title("TEST at DEV Youden threshold")
+    plt.show()   
+
+    yhat_test_06 = (p_meta_test >= 0.6).astype(int)
+    print("\n[TEST] report at threshold 0.6")
+    print(classification_report(y_meta_test, yhat_test_06, digits=4))
+    ConfusionMatrixDisplay.from_predictions(y_meta_test, yhat_test_06)
+    plt.title("TEST at threshold 0.6")
+    plt.show()
+
+    
 if __name__ == "__main__":
     main()
 
