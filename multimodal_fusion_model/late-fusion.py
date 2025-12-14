@@ -194,6 +194,20 @@ def build_meta_X_from_dicts(*probas_dicts, model_order=None, sort_keys=True):
     X_meta = np.column_stack([np.asarray(merged[k]).reshape(-1) for k in model_order])
     return X_meta, model_order
 
+def add_interaction_terms(probas_dict, interactions):
+
+    new_dict = probas_dict.copy()
+
+    for m1, m2 in interactions:
+        if m1 not in probas_dict or m2 not in probas_dict:
+            raise KeyError(f"Missing models for interaction: {m1}, {m2}")
+
+        interaction_name = f"{m1}x{m2}"
+        new_dict[interaction_name] = probas_dict[m1] * probas_dict[m2]
+
+    return new_dict
+
+
 def thresholds_youden_and_fixed(y_true, p):
 
     y_true = np.asarray(y_true).astype(int).reshape(-1)
@@ -301,17 +315,28 @@ def main():
     # plt.show()
     
     
-    X_meta_dev, model_order = build_meta_X_from_dicts(
-    probas_dict_text_dev,
-    probas_dict_audio_lightgbm_dev,
-    probas_dict_audio_logreg_dev,
-    model_order=None
+    probas_dev_all = (
+    probas_dict_text_dev
+    | probas_dict_audio_lightgbm_dev
+    | probas_dict_audio_logreg_dev
 )
+
+#     interaction_pairs = [
+#     ("hubert_None_baseline", "lightgbm_smote_hubert_mfcc_egemaps"),
+# ]
+
+#     probas_dev_all = add_interaction_terms(probas_dev_all, interaction_pairs)
+
+    X_meta_dev, model_order = build_meta_X_from_dicts(
+        probas_dev_all,
+        model_order=None
+    )
 
     y_meta_dev = y_dev_text.astype(int)
 
     meta_clf = LogisticRegression(
         solver="liblinear",
+        penalty="l2", 
         class_weight="balanced",   
         max_iter=10000
     )
@@ -321,30 +346,19 @@ def main():
     p_meta_dev = meta_clf.predict_proba(X_meta_dev)[:, 1]
     youden_thr, youden_j = thresholds_youden_and_fixed(y_meta_dev, p_meta_dev)
     print("DEV Youden thr:", youden_thr, "J:", youden_j)
-
-    # Results using youden to pick threshold
-    yhat_dev_youden = (p_meta_dev >= youden_thr).astype(int)
-    print("\n[DEV] report at Youden threshold")
-    print(classification_report(y_meta_dev, yhat_dev_youden, digits=4))
-    
-    ConfusionMatrixDisplay.from_predictions(y_meta_dev, yhat_dev_youden)
-    plt.title("DEV at Youden threshold")
-    plt.show()
-
-    yhat_dev_06 = (p_meta_dev >= 0.6).astype(int)
-    print("\n[DEV] report at threshold 0.6")
-    print(classification_report(y_meta_dev, yhat_dev_06, digits=4))
-
-    ConfusionMatrixDisplay.from_predictions(y_meta_dev, yhat_dev_06)
-    plt.title("DEV at threshold 0.6")
-    plt.show()
     
     # ---------- EVALUATION ON TEST ----------
+    probas_test_all = (
+    probas_dict_text_test
+    | probas_dict_audio_lightgbm_test
+    | probas_dict_audio_logreg_test
+)
+
+    # probas_test_all = add_interaction_terms(probas_test_all, interaction_pairs)
+
     X_meta_test, _ = build_meta_X_from_dicts(
-        probas_dict_text_test,
-        probas_dict_audio_lightgbm_test,
-        probas_dict_audio_logreg_test,
-        model_order=model_order  
+        probas_test_all,
+        model_order=model_order
     )
 
     y_meta_test = y_test_text.astype(int)
@@ -363,7 +377,7 @@ def main():
     ConfusionMatrixDisplay.from_predictions(y_meta_test, yhat_test_06)
     plt.title("TEST at threshold 0.6")
     plt.show()
-
+    
     
 if __name__ == "__main__":
     main()
