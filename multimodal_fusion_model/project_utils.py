@@ -7,6 +7,7 @@ import torch
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import confusion_matrix, roc_auc_score
 from imblearn.over_sampling import RandomOverSampler, SMOTE, BorderlineSMOTE
+from imblearn.under_sampling import RandomUnderSampler
 
 # =========================
 # REPRODUCIBILITY
@@ -22,7 +23,7 @@ def set_seed(seed=1):
 # =========================
 # DATA LOADING
 # =========================
-def load_processed_data(filename, base_path="data/processed/"):
+def load_processed_data(filename, base_path="../data/processed/"):
     df = pd.read_csv(f"{base_path}{filename}")
     df_train = df[df["split"] == "train"]
     df_dev = df[df["split"] == "dev"]
@@ -38,7 +39,7 @@ def load_processed_data(filename, base_path="data/processed/"):
     
     return X_train, y_train, X_dev, y_dev, df_train, df_dev
 
-def load_test_data(filename, base_path="data/processed/"):
+def load_test_data(filename, base_path="../data/processed/"):
     df = pd.read_csv(f"{base_path}{filename}")
     df_train = df[df["split"] == "train"]
     df_test = df[df["split"] == "test"]   # NEW
@@ -59,15 +60,17 @@ def load_test_data(filename, base_path="data/processed/"):
 
 
 # =========================
-# OVERSAMPLING FACTORY
+# SAMPLING FACTORY
 # =========================
-def get_oversampler(name, seed=42):
+def get_sampler(name, seed=42):
     if name == "RandomOverSampler":
         return RandomOverSampler(random_state=seed)
     elif name == "SMOTE":
         return SMOTE(random_state=seed)
     elif name == "BorderlineSMOTE":
         return BorderlineSMOTE(random_state=seed)
+    elif name == "RandomUnderSampler":
+        return RandomUnderSampler(random_state=seed)
     return None
 
 # =========================
@@ -83,6 +86,8 @@ def compute_best_youden(y_true, y_proba):
     best_threshold = 0.5
 
     for thr in thresholds:
+        if thr <= 0.01 or thr >= 0.99:
+            continue
         y_pred = (y_proba >= thr).astype(int)
         tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
 
@@ -99,7 +104,16 @@ def compute_best_youden(y_true, y_proba):
 # =========================
 # EVALUATION & REPORTING
 # =========================
-def evaluate_and_report(model, X_dev, y_dev, df_dev_ids, best_params, model_name, data, oversampler, save_path="experiment_results.csv"):
+def evaluate_and_report(model, 
+                        X_dev, 
+                        y_dev, 
+                        df_dev_ids, 
+                        best_params, 
+                        model_name, 
+                        data, 
+                        sampler, 
+                        reduction_method, 
+                        save_path="experiment_results.csv"):
     """
     Predicts probabilities, calculates AUC, finds best Youden threshold, 
     prints report, and saves to CSV.
@@ -151,7 +165,7 @@ def evaluate_and_report(model, X_dev, y_dev, df_dev_ids, best_params, model_name
             
             if not file_exists:
                 header = [
-                    "Model_Name","Data","Oversampler", 
+                    "Model_Name","Data","Sampler", "Reduction_Method", 
                     "AUC", "Youden_Index", "Best_Threshold", 
                     "TN", "FP", "FN", "TP", "False_Negative_IDs", "best_params"
                 ]
@@ -160,7 +174,8 @@ def evaluate_and_report(model, X_dev, y_dev, df_dev_ids, best_params, model_name
             writer.writerow([
                 model_name,
                 data,
-                oversampler,
+                sampler,
+                reduction_method,
                 f"{auc:.4f}",
                 f"{ydn:.4f}",
                 f"{best_thr:.3f}",

@@ -15,7 +15,8 @@ def summarize_group(df, group_cols=["Model_Name", "Data"]):
 
         summaries.append(f"\n• Best AUC:")
         summaries.append(
-            f"  - Oversampler: {best_auc['Oversampler']}\n"
+            f"  - Sampler: {best_auc['Sampler']}\n"
+            f"  - Reduction Method: {best_auc['Reduction_Method']}\n"
             f"  - AUC: {best_auc['AUC']:.4f}\n"
             f"  - Youden: {best_auc['Youden_Index']:.4f}\n"
             f"  - TP={best_auc['TP']}, FP={best_auc['FP']}, TN={best_auc['TN']}, FN={best_auc['FN']}\n"
@@ -25,7 +26,8 @@ def summarize_group(df, group_cols=["Model_Name", "Data"]):
 
         summaries.append(f"\n• Best Youden Index:")
         summaries.append(
-            f"  - Oversampler: {best_youden['Oversampler']}\n"
+            f"  - Sampler: {best_youden['Sampler']}\n"
+            f"  - Reduction Method: {best_youden['Reduction_Method']}\n"
             f"  - Youden: {best_youden['Youden_Index']:.4f}\n"
             f"  - AUC: {best_youden['AUC']:.4f}\n"
             f"  - TP={best_youden['TP']}, FP={best_youden['FP']}, TN={best_youden['TN']}, FN={best_youden['FN']}\n"
@@ -53,7 +55,7 @@ def summarize_group(df, group_cols=["Model_Name", "Data"]):
 
 if __name__ == "__main__":
     # Load CSV
-    df = pd.read_csv("early_fusion_results.csv")
+    df = pd.read_csv("EF_MLP_dev.csv")
 
     # Summarize
     output = summarize_group(df)

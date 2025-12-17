@@ -1,0 +1,40 @@
+
+=== Model: MLP | Data: concat_hubert_expertk_text ===
+
+• Best AUC:
+  - Sampler: SMOTE
+  - Reduction Method: PCA
+  - AUC: 0.7829
+  - Youden: 0.5678
+  - TP=11, FP=15, TN=28, FN=1
+  - False negatives: [np.int64(347)]
+  - Best params: {'lr': 0.0038285957997593544, 'optimizer': 'Adam', 'weight_decay': 2.9310540409758913e-05, 'hidden_dim': 224, 'dropout': 0.2}
+
+• Best Youden Index:
+  - Sampler: RandomOverSampler
+  - Reduction Method: SelectKBest
+  - Youden: 0.6143
+  - AUC: 0.7829
+  - TP=11, FP=13, TN=30, FN=1
+  - False negatives: [np.int64(412)]
+  - Best params: {'lr': 0.0018075629250533642, 'optimizer': 'Adam', 'weight_decay': 0.00011345863700912802, 'hidden_dim': 240, 'dropout': 0.2}
+
+=== Model: MLP | Data: concat_hubert_text ===
+
+• Best AUC:
+  - Sampler: SMOTE
+  - Reduction Method: PCA
+  - AUC: 0.7868
+  - Youden: 0.5136
+  - TP=7, FP=3, TN=40, FN=5
+  - False negatives: [np.int64(347), np.int64(402), np.int64(412), np.int64(448), np.int64(617)]
+  - Best params: {'lr': 0.004869651705259585, 'optimizer': 'Adam', 'weight_decay': 0.00044793705694048984, 'hidden_dim': 208, 'dropout': 0.4}
+
+• Best Youden Index:
+  - Sampler: BorderlineSMOTE
+  - Reduction Method: PCA
+  - Youden: 0.5678
+  - AUC: 0.7287
+  - TP=11, FP=15, TN=28, FN=1
+  - False negatives: [np.int64(412)]
+  - Best params: {'lr': 0.003033054135541267, 'optimizer': 'Adam', 'weight_decay': 0.004217617434678011, 'hidden_dim': 256, 'dropout': 0.4}
