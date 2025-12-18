@@ -286,33 +286,33 @@ def main():
         return roc_auc_score(y_true, proba)
 
 
-    # sampler = optuna.samplers.TPESampler(seed=42) # for reproducibility
-    # study_name = f"late-fusion"
-    # study = optuna.create_study(
-    #     study_name=study_name,
-    #     storage=get_optuna_storage_rdb(),
-    #     direction='maximize',
-    #     sampler=sampler,
-    #     load_if_exists=True
-    # )
+    sampler = optuna.samplers.TPESampler(seed=42) # for reproducibility
+    study_name = f"late-fusion"
+    study = optuna.create_study(
+        study_name=study_name,
+        storage=get_optuna_storage_rdb(),
+        direction='maximize',
+        sampler=sampler,
+        load_if_exists=True
+    )
     
-    # study.optimize(
-    #         lambda trial: objective(trial, y_dev_text),
-    #         n_trials=OPTUNA_N_TRIALS,
-    #         callbacks=[log_callback]
-    #     )
+    study.optimize(
+            lambda trial: objective(trial, y_dev_text),
+            n_trials=OPTUNA_N_TRIALS,
+            callbacks=[log_callback]
+        )
 
-    # best_weights = study.best_params
-    # print(best_weights)
+    best_weights = study.best_params
+    print(best_weights)
 
-    # hard_weighted_predictions, soft_weighted_predictions = weighted_vote(predictions_dict_test, best_weights)
+    hard_weighted_predictions, soft_weighted_predictions = weighted_vote(predictions_dict_test, best_weights)
 
-    # # get results
-    # report = classification_report(y_test_text, hard_weighted_predictions)
-    # print(report)
-    # # confusion matrix
-    # disp = ConfusionMatrixDisplay.from_predictions(y_test_text, hard_weighted_predictions)
-    # plt.show()
+    # get results
+    report = classification_report(y_test_text, hard_weighted_predictions)
+    print(report)
+    # confusion matrix
+    disp = ConfusionMatrixDisplay.from_predictions(y_test_text, hard_weighted_predictions)
+    plt.show()
     
     
     probas_dev_all = (
