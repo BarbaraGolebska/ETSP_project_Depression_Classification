@@ -22,7 +22,7 @@ def set_seed(seed=1):
 # =========================
 # DATA LOADING
 # =========================
-def load_processed_data(filename, base_path="data/processed/"):
+def load_processed_data(filename, base_path="../data/processed/audio/hubert/"):
     df = pd.read_csv(f"{base_path}{filename}")
     df_train = df[df["split"] == "train"]
     df_dev = df[df["split"] == "dev"]
@@ -38,10 +38,11 @@ def load_processed_data(filename, base_path="data/processed/"):
     
     return X_train, y_train, X_dev, y_dev, df_train, df_dev
 
-def load_test_data(filename, base_path="data/processed/"):
+
+def load_test_data(filename, base_path="../data/processed/audio/hubert/"):
     df = pd.read_csv(f"{base_path}{filename}")
     df_train = df[df["split"] == "train"]
-    df_test = df[df["split"] == "test"]   # NEW
+    df_test = df[df["split"] == "dev"]   # NEW
 
     drop_cols = ["participant_id", "target_depr", "target_ptsd", "split"]
     
@@ -172,4 +173,27 @@ def evaluate_and_report(model, X_dev, y_dev, df_dev_ids, best_params, model_name
     except Exception as e:
         print(f"Error writing to CSV: {e}")
     
-    return auc
+    return auc, best_thr
+
+
+class BaselineLinearWrapper:
+
+    def __init__(self, model: torch.nn.Module, best_threshold: float):
+        self.model = model
+        self.best_threshold = best_threshold
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+
+        self.model.eval()
+        device = next(self.model.parameters()).device
+
+        with torch.no_grad():
+            if isinstance(X, np.ndarray):
+                X_tensor = torch.tensor(X, dtype=torch.float32).to(device)
+            else:
+                X_tensor = X.to(device)
+
+            logits = self.model(X_tensor).squeeze(-1)
+            probs = torch.sigmoid(logits).cpu().numpy()
+
+        return probs

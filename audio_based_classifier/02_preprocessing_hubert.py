@@ -3,7 +3,7 @@ import os
 import pandas as pd
 
 # Path to the processed embeddings directory
-FOLDER = r"C:\Users\ninas\OneDrive\Documentos\Master\AI\1st Semester\Essentials Text and Speech\ESTP_project-2\data\embeddings\processed"
+FOLDER = r"data/raw/features"
 
 # Path to the labels CSV
 LABELS_PATH = r"data/raw/labels/detailed_labels.csv"
@@ -21,7 +21,7 @@ for fname in files:
     path = os.path.join(FOLDER, fname)
 
     # ---- Extract participant ID ----
-    participant_id = fname.split("_embedding")[0]
+    participant_id = fname.split("_hubert_embedding")[0]
 
     # ---- Load the embedding ----
     arr = np.load(path)  # shape: (768,)
@@ -54,7 +54,7 @@ df = df.merge(labels_df[["participant_id", "target_depr", "target_ptsd", "split"
 
 # ---- Save CSV ----
 #df = df.set_index("participant_id")
-output_path = "data/processed/hubert_aggregated_embeddings.csv"
+output_path = "data/processed/audio/hubert/hubert_aggregated_embeddings.csv"
 df.to_csv(output_path, index=False)
 
 print("Final DataFrame shape:", df.shape)

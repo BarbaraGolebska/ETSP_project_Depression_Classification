@@ -112,10 +112,10 @@ def run_experiment(model_type="lightgbm", number_of_trials=20):
         "adasyn": ADASYN(random_state=42)
     }
 
-    root_dir = Path("../data/results")
+    root_dir = Path("../audio_based_classifier/tree_models/experiments")
     root_dir.mkdir(parents=True, exist_ok=True)
 
-    out_dir = Path("../data/vectors/new")
+    out_dir = Path("../data/processed/audio/lightgbm_smote_hubert_mfcc_egemaps")
 
     X_train = np.load(out_dir / "X_train.npy")
     y_train = np.load(out_dir / "y_train.npy")
