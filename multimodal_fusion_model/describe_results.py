@@ -19,7 +19,8 @@ def summarize_group(df, group_cols=["Model_Name", "Data"]):
             f"  - Reduction Method: {best_auc['Reduction_Method']}\n"
             f"  - AUC: {best_auc['AUC']:.4f}\n"
             f"  - Youden: {best_auc['Youden_Index']:.4f}\n"
-            f"  - TP={best_auc['TP']}, FP={best_auc['FP']}, TN={best_auc['TN']}, FN={best_auc['FN']}\n"
+            f"  - Threshold: {best_auc['Best_Threshold']:.4f}\n"
+            f"  - TN={best_auc['TN']}, FP={best_auc['FP']}, FN={best_auc['FN']}, TP={best_auc['TP']}\n"
             f"  - False negatives: {best_auc['False_Negative_IDs']}\n"
             f"  - Best params: {best_auc['best_params']}"
         )
@@ -28,9 +29,10 @@ def summarize_group(df, group_cols=["Model_Name", "Data"]):
         summaries.append(
             f"  - Sampler: {best_youden['Sampler']}\n"
             f"  - Reduction Method: {best_youden['Reduction_Method']}\n"
-            f"  - Youden: {best_youden['Youden_Index']:.4f}\n"
             f"  - AUC: {best_youden['AUC']:.4f}\n"
-            f"  - TP={best_youden['TP']}, FP={best_youden['FP']}, TN={best_youden['TN']}, FN={best_youden['FN']}\n"
+            f"  - Youden: {best_youden['Youden_Index']:.4f}\n"
+            f"  - Threshold: {best_youden['Best_Threshold']:.4f}\n"
+            f"  - TN={best_youden['TN']}, FP={best_youden['FP']}, FN={best_youden['FN']}, TP={best_youden['TP']}\n"
             f"  - False negatives: {best_youden['False_Negative_IDs']}\n"
             f"  - Best params: {best_youden['best_params']}"
         )
@@ -55,7 +57,7 @@ def summarize_group(df, group_cols=["Model_Name", "Data"]):
 
 if __name__ == "__main__":
     # Load CSV
-    df = pd.read_csv("EF_MLP_dev.csv")
+    df = pd.read_csv("results/EF_MLP_test.csv")
 
     # Summarize
     output = summarize_group(df)
