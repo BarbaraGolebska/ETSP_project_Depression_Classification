@@ -33,7 +33,10 @@ We utilize the **E-DAIC dataset**, a component of the DAIC Corpus, which feature
 
 ## Evaluation
 
-...
+**Metrics**:
+- **AUC-ROC**: Primary ranking metric
+- **Youden's J statistic** (Sensitivity + Specificity - 1): Threshold selection
+
 
 ## Project Structure
 
@@ -41,7 +44,7 @@ We utilize the **E-DAIC dataset**, a component of the DAIC Corpus, which feature
 ESTP_project/
 ├── README.md
 ├── audio_based_classifier/     # Audio processing and classification
-├── daic_data/                  # Dataset and preprocessing scripts
+├── data/                       # Dataset and preprocessing scripts
 ├── multimodal_fusion_model/    # Fusion strategies and models
 └── text_based_classifier/      # Text processing and classification
 ```
