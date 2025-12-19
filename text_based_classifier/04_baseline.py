@@ -16,7 +16,7 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from tokenizer import nltk_preprocess
 
 OPTUNA_N_TRIALS = 50
-OPTUNA_STORAGE_PATH = "./baseline_optuna_journal_storage.log"
+OPTUNA_STORAGE_PATH = "./optuna/baseline_optuna_journal_storage.log"
 # Add a deterministic pruner (median over previous trials)
 OPTUNA_PRUNER = optuna.pruners.MedianPruner(
     n_warmup_steps=1,   # don't prune before at least 1 reported step
