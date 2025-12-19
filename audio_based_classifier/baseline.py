@@ -229,6 +229,111 @@ def train_best_model(ftypes, oversampling_methods, best=None, save_path="test_ba
                 save_path="test_baseline_results.csv"
             )
 
+def evaluate_baseline_hubert_single_test(
+    data_key,
+    ftypes_mapping,
+    dev_threshold=0.7539
+):
+    """
+    Train and test a single Baseline HuBERT model configuration
+    using fixed hyperparameters (for debugging / validation).
+    """
+
+    utils.set_seed(1)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
+
+    # Fixed hyperparameters (from your row)
+    best_params = {
+        "lr": 0.09540141357202427,
+        "optimizer": "Adam",
+        "epochs": 20
+    }
+    oversampler_name = "ADASYN"
+
+    # ------------------------------------------------------------------
+    # Load data
+    # ------------------------------------------------------------------
+    if data_key not in ftypes_mapping:
+        raise ValueError(f"Data key '{data_key}' not found in ftypes mapping")
+
+    path = ftypes_mapping[data_key]
+
+    X_train_np, y_train_np, _, _, _, _ = utils.load_processed_data(path, "./data/processed/")
+    X_test_np, y_test_np, _ = utils.load_test_data(path, "./data/processed/")
+
+    # ------------------------------------------------------------------
+    # Oversampling (TRAIN only)
+    # ------------------------------------------------------------------
+    sampler = utils.get_oversampler(oversampler_name)
+    if sampler is not None:
+        X_train_np, y_train_np = sampler.fit_resample(X_train_np, y_train_np)
+
+    # ------------------------------------------------------------------
+    # Convert to tensors
+    # ------------------------------------------------------------------
+    X_train_t = torch.tensor(X_train_np, dtype=torch.float32).to(device)
+    y_train_t = torch.tensor(y_train_np, dtype=torch.float32).to(device)
+    X_test_t = torch.tensor(X_test_np, dtype=torch.float32).to(device)
+
+    # ------------------------------------------------------------------
+    # Model
+    # ------------------------------------------------------------------
+    model = create_model(X_train_t.shape[1], device)
+
+    optimizer_cls = getattr(torch.optim, best_params["optimizer"])
+    optimizer = optimizer_cls(model.parameters(), lr=best_params["lr"])
+    criterion = nn.BCEWithLogitsLoss()
+
+    # ------------------------------------------------------------------
+    # Training
+    # ------------------------------------------------------------------
+    model.train()
+    for epoch in range(best_params["epochs"]):
+        train_epoch(model, optimizer, criterion, X_train_t, y_train_t)
+
+    # ------------------------------------------------------------------
+    # Test evaluation
+    # ------------------------------------------------------------------
+    model.eval()
+    with torch.no_grad():
+        logits = model(X_test_t).squeeze()
+        y_proba = torch.sigmoid(logits).cpu().numpy()
+
+        if y_proba.ndim == 0:
+            y_proba = np.array([y_proba])
+
+        # AUC
+        try:
+            test_auc = roc_auc_score(y_test_np, y_proba)
+        except ValueError:
+            test_auc = 0.5
+
+        # Apply DEV threshold
+        y_pred = (y_proba >= dev_threshold).astype(int)
+
+        tn, fp, fn, tp = confusion_matrix(y_test_np, y_pred).ravel()
+
+        precision = precision_score(y_test_np, y_pred, zero_division=0)
+        recall = recall_score(y_test_np, y_pred, zero_division=0)
+        f1 = f1_score(y_test_np, y_pred, zero_division=0)
+
+        specificity = tn / (tn + fp) if (tn + fp) > 0 else 0.0
+        test_youden = recall + specificity - 1
+
+    # ------------------------------------------------------------------
+    # Print results (no CSV)
+    # ------------------------------------------------------------------
+    print("\n===== TEST RESULTS =====")
+    print(f"AUC        : {test_auc:.4f}")
+    print(f"Youden     : {test_youden:.4f}")
+    print(f"Precision  : {precision:.4f}")
+    print(f"Recall     : {recall:.4f}")
+    print(f"Specificity: {specificity:.4f}")
+    print(f"F1         : {f1:.4f}")
+    print(f"TN FP FN TP: {tn} {fp} {fn} {tp}")
+
+
 
 def evaluate_on_test_set(results_csv_path, ftypes_mapping):
     """
@@ -283,8 +388,8 @@ def evaluate_on_test_set(results_csv_path, ftypes_mapping):
         
         # 4. Load Data
         path = ftypes_mapping[data_key]
-        X_train_np, y_train_np, _, _, _, _ = utils.load_processed_data(path)
-        X_test_np, y_test_np, _ = utils.load_test_data(path) # Ensure this function exists in utils
+        X_train_np, y_train_np, _, _, _, _ = utils.load_processed_data(path, "./data/processed/")
+        X_test_np, y_test_np, _ = utils.load_test_data(path, "./data/processed/") # Ensure this function exists in utils
 
         # 5. Oversampling (Apply to Train only)
         sampler = utils.get_oversampler(oversampler_name)
@@ -362,12 +467,26 @@ if __name__ == "__main__":
     # MAIN EXECUTION
     # =========================
     # Define your file mappings here so the code knows what "concat_hubert_text" maps to
+
     ftypes = {
-    #"concat_hubert_text": "concat_early_fusion.csv", 
-    "concat_hubert_text": "EF_hubert_text.csv", #text + hubert
-    "concat_hubert_expertk_text": "EF_hubert_text_expertk.csv" #text + hubert + expertk (opensmile mfcc and egemaps)
-    #"concat_hubert_expertk_text": "expertk_hubert_text_concat_early_fusion.csv" #text + hubert + expertk (opensmile mfcc and egemaps)
+    "expert_k": "ExpertK_aggregated_features.csv",
+    "bow": "BoW_aggregated_features.csv",
+    "deep_rep": "DeepR_aggregated_features.csv",
+    "hubert": "hubert_aggregated_embeddings.csv",
+    "BOW_MFCC": "BOWMFCC_aggregated_features.csv",
+    "BOW_Egemaps": "BOWEgemaps_aggregated_features.csv",
+    "VGG16": "VGG16_aggregated_features.csv",
+    "DenseNet201": "DenseNet201_aggregated_features.csv",
+    "all": "merged_all_features.csv",
+    "all_incl_hubert": "merged_all_features_hubert.csv",
+    "ek_egemaps":"ek_egemaps_aggregated_features.csv",
+    "ek_mfcc":"ek_mfcc_aggregated_features.csv",
+
+    #"concat_hubert_text": "EF_hubert_text.csv", #text + hubert
+    #"concat_hubert_expertk_text": "EF_hubert_text_expertk.csv" #text + hubert + expertk (opensmile mfcc and egemaps)
     }
     
-    csv_path = "early_fusion_results.csv" # The file you pasted
+    csv_path = "combined_baseline_results.csv" # The file you pasted
     evaluate_on_test_set(csv_path, ftypes)
+
+    #evaluate_baseline_hubert_single_test(data_key="hubert", ftypes_mapping=ftypes)
