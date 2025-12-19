@@ -1,6 +1,6 @@
 
-from audio_based_classifier.baseline_03 import train_models as audio_baseline_main
-from audio_based_classifier.tree_models.tree_models_03 import run_experiment as audio_tree_models_main
+from audio_based_classifier.baseline import train_models as audio_baseline_main
+from audio_based_classifier.tree_models.tree_models import run_experiment as audio_tree_models_main
 #from audio_based_classifier import train_models as audio_baseline_main
 
 def main():
