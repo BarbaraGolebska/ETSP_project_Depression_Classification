@@ -1,9 +1,10 @@
 # Multimodal Fusion
 
+This folder contains scripts for performing both **early** and **late multimodal fusion** of audio and text data. Early fusion combines feature representations, while late fusion integrates predictions from the best-performing unimodal models, with the goal of improving patient-level prediction.
 
 # EARLY FUSION
 
-This folder contains scripts for performing **early fusion** of audio and text features, training multimodal classifiers, and formatting evaluation results. The pipeline focuses on combining the best-performing unimodal models to improve patient-level prediction.
+In this part **early fusion** of audio and text features is performed, along with training multimodal classifiers, and formatting evaluation results. 
 
 ## Folder Structure and Script Description
 
@@ -67,3 +68,11 @@ Contains helper functions.
 
 
 # LATE FUSION
+
+
+## Typical Workflow
+
+In this part, **late fusion** of audio and text modalities is performed by integrating the predictions of independently trained unimodal models, followed by evaluation and result formatting.
+
+1. **Perform late fusion**
+   - Run `python late-fusion.py` to perform late fusion using equal and optimized model weights, as well as logistic regression. The number of Optuna trials used for optimizing the weights can be specified at the top of the script.
