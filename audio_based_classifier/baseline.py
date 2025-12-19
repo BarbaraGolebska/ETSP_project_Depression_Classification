@@ -485,8 +485,10 @@ if __name__ == "__main__":
     #"concat_hubert_text": "EF_hubert_text.csv", #text + hubert
     #"concat_hubert_expertk_text": "EF_hubert_text_expertk.csv" #text + hubert + expertk (opensmile mfcc and egemaps)
     }
+
+    train_models()
     
-    csv_path = "combined_baseline_results.csv" # The file you pasted
-    evaluate_on_test_set(csv_path, ftypes)
+    #csv_path = "combined_baseline_results.csv" # The file you pasted
+    #evaluate_on_test_set(csv_path, ftypes)
 
     #evaluate_baseline_hubert_single_test(data_key="hubert", ftypes_mapping=ftypes)
