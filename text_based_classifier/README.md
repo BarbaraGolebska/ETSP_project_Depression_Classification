@@ -14,6 +14,7 @@ text_based_classifier/
 ├── 06_bilstm_attn.py          # BiLSTM + attention model (sequence-based)
 ├── punctuationmodel.py        # Auxiliary punctuation restoration model
 ├── results/                   # Saved models, thresholds, metrics, plots
+├── optuna/                    # Saved optuna studies
 └── README.md                  # This file
 ```
 
