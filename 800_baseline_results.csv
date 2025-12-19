@@ -1,5 +1,0 @@
-Model_Name,Data,Oversampler,AUC,Youden_Index,Best_Threshold,TN,FP,FN,TP,False_Negative_IDs,best_params
-Baseline_Linear,hubert,None,0.7384,0.5407,0.624,34,9,3,9,"[347, 388, 448]","{'lr': 0.05042599638791321, 'optimizer': 'Adam', 'epochs': 30}"
-Baseline_Linear,hubert,RandomOverSampler,0.7481,0.5640,0.884,35,8,3,9,"[347, 412, 448]","{'lr': 0.027161129658907632, 'optimizer': 'Adam', 'epochs': 20}"
-Baseline_Linear,hubert,SMOTE,0.6550,0.3043,0.960,31,12,5,7,"[347, 381, 412, 448, 698]","{'lr': 0.025286787175198503, 'optimizer': 'Adam', 'epochs': 10}"
-Baseline_Linear,hubert,BorderlineSMOTE,0.7345,0.5271,0.997,37,6,4,8,"[347, 388, 412, 448]","{'lr': 0.04705353699640875, 'optimizer': 'Adam', 'epochs': 20}"
