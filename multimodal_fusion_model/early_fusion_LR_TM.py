@@ -16,12 +16,12 @@ def main():
     oversampling_methods = ["ADASYN"]
 
     # Call audio-based baseline
-    #audio_baseline_main(ftypes, oversampling_methods, save_path="early_fusion_results.csv")
+    audio_baseline_main(ftypes, oversampling_methods, save_path="early_fusion_results.csv")
 
     # try with hubert + text + expertk
     data_path = "EF_hubert_text_expertk.csv"
-    # try with hubert + text 
-    data_path = "EF_hubert_text_expertk.csv"
+    # if you want to try with hubert + text 
+    data_path = "EF_hubert_text.csv"
     
     metrics_path = "tree_models_results.csv"
 
@@ -32,5 +32,5 @@ def main():
 
 
 if __name__ == "__main__":
-    ## RUN USING THE FOLLOWING COMMAND: python -m multimodal_fusion_model.final_early_fusion                                                                                           
+    ## RUN USING THE FOLLOWING COMMAND: python -m multimodal_fusion_model.early_fusion_LR_TM                                                                                          
     main()
