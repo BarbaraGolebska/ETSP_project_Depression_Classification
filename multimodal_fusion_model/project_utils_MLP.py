@@ -4,9 +4,13 @@ import random
 import os
 import csv
 import torch
+import ast
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import confusion_matrix, roc_auc_score
+from sklearn.decomposition import PCA
+from sklearn.feature_selection import SelectKBest, f_classif
 from imblearn.over_sampling import RandomOverSampler, SMOTE, BorderlineSMOTE, ADASYN
+from imblearn.under_sampling import RandomUnderSampler
 
 # =========================
 # REPRODUCIBILITY
@@ -22,7 +26,7 @@ def set_seed(seed=1):
 # =========================
 # DATA LOADING
 # =========================
-def load_processed_data(filename, base_path="../data/processed/audio/hubert/"):
+def load_processed_data(filename, base_path="../data/processed/"):
     df = pd.read_csv(f"{base_path}{filename}")
     df_train = df[df["split"] == "train"]
     df_dev = df[df["split"] == "dev"]
@@ -38,11 +42,10 @@ def load_processed_data(filename, base_path="../data/processed/audio/hubert/"):
     
     return X_train, y_train, X_dev, y_dev, df_train, df_dev
 
-
-def load_test_data(filename, base_path="../data/processed/audio/hubert/"):
+def load_test_data(filename, base_path="../data/processed/"):
     df = pd.read_csv(f"{base_path}{filename}")
     df_train = df[df["split"] == "train"]
-    df_test = df[df["split"] == "dev"]   # NEW
+    df_test = df[df["split"] == "test"]   # NEW
 
     drop_cols = ["participant_id", "target_depr", "target_ptsd", "split"]
     
@@ -60,23 +63,46 @@ def load_test_data(filename, base_path="../data/processed/audio/hubert/"):
 
 
 # =========================
-# OVERSAMPLING FACTORY
+# SAMPLING FACTORY
 # =========================
-def get_oversampler(name, seed=42):
+def get_sampler(name, seed=42):
     if name == "RandomOverSampler":
         return RandomOverSampler(random_state=seed)
     elif name == "SMOTE":
         return SMOTE(random_state=seed)
     elif name == "BorderlineSMOTE":
         return BorderlineSMOTE(random_state=seed)
+    elif name == "RandomUnderSampler":
+        return RandomUnderSampler(random_state=seed)
     elif name == "ADASYN":
         return ADASYN(random_state=seed)
     return None
 
+
+# =========================
+# DIMENSIONALITY REDUCTION
+# =========================
+def dim_reduction(X_train, y_train, X_dev, method = "PCA", n_components=50):
+    """Applies dimensionality reduction to the feature matrix X."""
+    if method == "PCA":
+        n_components = min(n_components, X_train.shape[1])
+        pca = PCA(n_components=n_components, random_state=42)
+        X_train_red = pca.fit_transform(X_train)
+        X_dev_red   = pca.transform(X_dev)
+    elif method == "SelectKBest":
+        k = min(n_components, X_train.shape[1])
+        selector = SelectKBest(score_func=f_classif, k=k)
+        X_train_red = selector.fit_transform(X_train, y_train)
+        X_dev_red   = selector.transform(X_dev)
+    else:
+        raise ValueError(f"Unknown dimensionality reduction method: {method}")
+    return X_train_red, X_dev_red
+
+
 # =========================
 # METRICS
 # =========================
-def compute_best_youden(y_true, y_proba):
+def find_best_youden(y_true, y_proba):
     """
     Finds optimal threshold maximizing Youden Index (J).
     J = Sensitivity + Specificity - 1
@@ -86,6 +112,8 @@ def compute_best_youden(y_true, y_proba):
     best_threshold = 0.5
 
     for thr in thresholds:
+        if thr < 0.01 or thr > 0.99:
+            continue
         y_pred = (y_proba >= thr).astype(int)
         tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
 
@@ -99,10 +127,33 @@ def compute_best_youden(y_true, y_proba):
 
     return best_youden, best_threshold
 
+def compute_youden(y_true, y_proba, threshold):
+    """
+    Computes Youden Index for a given threshold.
+    """
+    y_pred = (y_proba >= threshold).astype(int)
+    tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+
+    sensitivity = tp / (tp + fn + 1e-12)
+    specificity = tn / (tn + fp + 1e-12)
+    youden = sensitivity + specificity - 1
+
+    return youden
+
+
 # =========================
 # EVALUATION & REPORTING
 # =========================
-def evaluate_and_report(model, X_dev, y_dev, df_dev_ids, best_params, model_name, data, oversampler, save_path="experiment_results.csv"):
+def evaluate_and_report(model, 
+                        X_dev, 
+                        y_dev, 
+                        df_dev_ids, 
+                        best_params, 
+                        model_name, 
+                        data, 
+                        sampler, 
+                        reduction_method, 
+                        save_path="experiment_results.csv"):
     """
     Predicts probabilities, calculates AUC, finds best Youden threshold, 
     prints report, and saves to CSV.
@@ -126,7 +177,11 @@ def evaluate_and_report(model, X_dev, y_dev, df_dev_ids, best_params, model_name
     auc = roc_auc_score(y_dev, y_proba)
     
     # Youden Index (Thresholding metric)
-    ydn, best_thr = compute_best_youden(y_dev, y_proba)
+    if "Best_Threshold" in best_params: # use predefined threshold
+        best_thr = best_params["Best_Threshold"]
+        ydn = compute_youden(y_dev, y_proba, best_thr)
+    else:
+        ydn, best_thr = find_best_youden(y_dev, y_proba)
     
     # Apply Threshold
     y_pred = (y_proba >= best_thr).astype(int)
@@ -154,7 +209,7 @@ def evaluate_and_report(model, X_dev, y_dev, df_dev_ids, best_params, model_name
             
             if not file_exists:
                 header = [
-                    "Model_Name","Data","Oversampler", 
+                    "Model_Name","Data","Sampler", "Reduction_Method", 
                     "AUC", "Youden_Index", "Best_Threshold", 
                     "TN", "FP", "FN", "TP", "False_Negative_IDs", "best_params"
                 ]
@@ -163,7 +218,8 @@ def evaluate_and_report(model, X_dev, y_dev, df_dev_ids, best_params, model_name
             writer.writerow([
                 model_name,
                 data,
-                oversampler,
+                sampler,
+                reduction_method,
                 f"{auc:.4f}",
                 f"{ydn:.4f}",
                 f"{best_thr:.3f}",
@@ -175,27 +231,41 @@ def evaluate_and_report(model, X_dev, y_dev, df_dev_ids, best_params, model_name
     except Exception as e:
         print(f"Error writing to CSV: {e}")
     
-    return auc, best_thr
+    return auc
 
 
-class BaselineLinearWrapper:
+# =========================
+# HYPERPARAMETER EXTRACTION
+# =========================
+def get_best_params_by_youden(
+    df: pd.DataFrame,
+    group_cols=["Model_Name", "Data"],
+    model_name: str = "MLP",
+):
+    """
+    Extracts the best hyperparameters for each group based on the highest Youden Index.
+    """
 
-    def __init__(self, model: torch.nn.Module, best_threshold: float):
-        self.model = model
-        self.best_threshold = best_threshold
+    # Filter by model name if provided
+    if model_name is not None:
+        df = df[df["Model_Name"] == model_name].copy()
 
-    def predict(self, X: np.ndarray) -> np.ndarray:
+    best_configs = {}
 
-        self.model.eval()
-        device = next(self.model.parameters()).device
+    for group_key, group_df in df.groupby(group_cols):
+        # group_key = (Model_Name, Data, Sampler, Reduction_Method)
+        idx = group_df["Youden_Index"].idxmax()
+        best_row = group_df.loc[idx]
 
-        with torch.no_grad():
-            if isinstance(X, np.ndarray):
-                X_tensor = torch.tensor(X, dtype=torch.float32).to(device)
-            else:
-                X_tensor = X.to(device)
+        try:
+            params = ast.literal_eval(best_row["best_params"])
+        except Exception:
+            params = {}
 
-            logits = self.model(X_tensor).squeeze(-1)
-            probs = torch.sigmoid(logits).cpu().numpy()
+        params["Best_Threshold"] = best_row["Best_Threshold"]
+        params["Sampler"] = str(best_row["Sampler"])
+        params["Reduction_Method"] = str(best_row["Reduction_Method"])
 
-        return probs
+        best_configs[group_key] = params
+
+    return best_configs

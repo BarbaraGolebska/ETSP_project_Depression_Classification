@@ -16,8 +16,14 @@ from imblearn.over_sampling import RandomOverSampler, SMOTE, ADASYN
 from sklearn.base import BaseEstimator, TransformerMixin
 
 import lightgbm as lgb
+import pandas as pd
 from catboost import CatBoostClassifier
 from audio_based_classifier.tree_models.utils import ModelPipeline
+try:
+    from audio_based_classifier import project_utils as utils
+
+except ImportError:
+    import project_utils as utils
 
 logging.basicConfig(level=logging.INFO)
 
@@ -104,7 +110,7 @@ def train_catboost(trial, X_train, y_train, class_weights):
 # ---------------- MASTER FUNCTION ---------------
 ##################################################
 
-def run_experiment(model_type="lightgbm", number_of_trials=20):
+def run_experiment(data_path,metrics_path,save_models=False,model_type="lightgbm", number_of_trials=20):
 
     oversamplers = {
         "random_oversampler": RandomOverSampler(random_state=42),
@@ -112,17 +118,26 @@ def run_experiment(model_type="lightgbm", number_of_trials=20):
         "adasyn": ADASYN(random_state=42)
     }
 
-    root_dir = Path("../audio_based_classifier/tree_models/experiments")
+    root_dir = Path("../data/results")
     root_dir.mkdir(parents=True, exist_ok=True)
 
-    out_dir = Path("../data/processed/audio/lightgbm_smote_hubert_mfcc_egemaps")
+    out_dir = Path("../data/vectors/new")
+    if data_path is None:
+        X_train = np.load(out_dir / "X_train.npy")
+        y_train = np.load(out_dir / "y_train.npy")
+        X_dev = np.load(out_dir / "X_dev.npy")
+        y_dev = np.load(out_dir / "y_dev.npy")
+        X_test = np.load(out_dir / "X_test.npy")
+        y_test = np.load(out_dir / "y_test.npy")
 
-    X_train = np.load(out_dir / "X_train.npy")
-    y_train = np.load(out_dir / "y_train.npy")
-    X_dev = np.load(out_dir / "X_dev.npy")
-    y_dev = np.load(out_dir / "y_dev.npy")
-    X_test = np.load(out_dir / "X_test.npy")
-    y_test = np.load(out_dir / "y_test.npy")
+    else:
+
+        # Load from CSV instead of .npy files
+        X_train, y_train, X_dev, y_dev, df_train, df_dev = utils.load_processed_data(
+            data_path
+        )
+
+        X_test, y_test, df_test = utils.load_test_data(data_path)
 
     X_train = impute_nans(X_train)
     X_dev = impute_nans(X_dev)
@@ -253,12 +268,49 @@ def run_experiment(model_type="lightgbm", number_of_trials=20):
 
         with open(sampler_dir / "metrics.json", "w") as f:
             json.dump(metrics, f, indent=4)
-            
 
-        if model_type == "lightgbm":
-            final_model.save_model(sampler_dir / "model_lightgbm.txt")
-        else:
-            final_model.save_model(sampler_dir / "model_catboost.cbm")
+
+
+        # ----------------
+        # Flatten for CSV
+        # ----------------
+        flat_metrics = {
+            **{k: v for k, v in metrics.items()
+            if k not in ["dev_confusion", "test_confusion", "best_params"]},
+
+            "dev_tn": tn,
+            "dev_fp": fp,
+            "dev_fn": fn,
+            "dev_tp": tp,
+
+            "test_tn": tn2,
+            "test_fp": fp2,
+            "test_fn": fn2,
+            "test_tp": tp2,
+
+            **{f"param_{k}": v for k, v in best_params.items()}
+        }
+
+        df = pd.DataFrame([flat_metrics])
+
+        # ----------------
+        # Write / append CSV
+        # ----------------
+        csv_path = Path(sampler_dir+metrics_path)
+
+        df.to_csv(
+            csv_path,
+            mode="a" if csv_path.exists() else "w",
+            header=not csv_path.exists(),
+            index=False
+        )
+
+            
+        if save_models:
+            if model_type == "lightgbm":
+                final_model.save_model(sampler_dir / "model_lightgbm.txt")
+            else:
+                final_model.save_model(sampler_dir / "model_catboost.cbm")
 
         joblib.dump(scaler, sampler_dir / "scaler.pkl")
         np.save(sampler_dir / "dev_preds.npy", dev_preds)
@@ -268,8 +320,9 @@ def run_experiment(model_type="lightgbm", number_of_trials=20):
     
 
 if __name__ == "__main__":
-    
-    run_experiment(model_type="lightgbm", number_of_trials=500)
+    # run using python -m audio_based_classifier.tree_models.tree_models_03
+    metrics_path="metrics_tree_models.csv"
+    run_experiment(None,metrics_path, model_type="lightgbm", number_of_trials=500)
 
     
     
