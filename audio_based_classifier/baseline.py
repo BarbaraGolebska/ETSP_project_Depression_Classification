@@ -115,7 +115,7 @@ def train_models(ftypes=ftypes, oversampling_methods=oversampling_methods, save_
 
     for ftype, path in ftypes.items():
         # Load Data (Numpy format)
-        X_train_np, y_train_np, X_dev_np, y_dev_np, df_train, df_dev = utils.load_processed_data(path)
+        X_train_np, y_train_np, X_dev_np, y_dev_np, df_train, df_dev = utils.load_processed_data(path,"./data/processed/" )
         
         # Extract groups for proper cross-validation
         groups = df_train["participant_id"].values
@@ -179,7 +179,7 @@ def train_best_model(ftypes, oversampling_methods, best=None, save_path="test_ba
 
     for ftype, path in ftypes.items():
         # Load Data (Numpy format)
-        X_train_np, y_train_np, X_dev_np, y_dev_np, df_train, df_dev = utils.load_processed_data(path)
+        X_train_np, y_train_np, X_dev_np, y_dev_np, df_train, df_dev = utils.load_processed_data(path, "./data/processed/")
         X_test, y_test, df_test = utils.load_test_data(path)
         
         # Extract groups for proper cross-validation
@@ -229,7 +229,7 @@ def train_best_model(ftypes, oversampling_methods, best=None, save_path="test_ba
                 save_path="test_baseline_results.csv"
             )
 
-def evaluate_baseline_hubert_single_test(
+def evaluate_baseline_single_test(
     data_key,
     ftypes_mapping,
     dev_threshold=0.7539
