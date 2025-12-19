@@ -55,7 +55,7 @@ def extract(df):
     return np.vstack(df["embedding"].to_numpy()), df["target_depr"].astype(int).to_numpy()
 
 def get_text_based_datasets():
-    embeddings_df = pd.read_csv("../data/processed/text/embeddings.csv", index_col=0,
+    embeddings_df = pd.read_csv("../data/processed/embeddings.csv", index_col=0,
                                 converters={"embedding": lambda s:
                                 np.fromstring(s.strip("[]"), sep=" ")})  # make sure embeddings are numpy array
     train_df, dev_df, test_df = split(embeddings_df)
