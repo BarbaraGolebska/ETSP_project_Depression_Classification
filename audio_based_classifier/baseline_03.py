@@ -7,8 +7,10 @@ import pandas as pd
 from sklearn.model_selection import GroupKFold
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import roc_auc_score, precision_score, recall_score, f1_score, confusion_matrix
-import project_utils as utils
-#from . import project_utils as utils
+try:
+    import project_utils as utils
+except ImportError:
+    from . import project_utils as utils
 
 
 # =========================
@@ -202,8 +204,6 @@ def train_best_model(ftypes, oversampling_methods, best=None, save_path="test_ba
             y_train_t = torch.tensor(y_train_os, dtype=torch.float32).to(device)
 
             # C. Initialize & Train
-            #best = {'lr': 0.09840764582498135, 'optimizer': 'Adam', 'epochs': 30} #youden 0.51
-            best = {'lr': 0.027161129658907632, 'optimizer': 'Adam', 'epochs': 20} #youden 0.56
             final_model = create_model(X_train_t.shape[1], device)
             optimizer = getattr(torch.optim, best["optimizer"])(final_model.parameters(), lr=best["lr"])
             criterion = nn.BCEWithLogitsLoss()
@@ -359,8 +359,8 @@ if __name__ == "__main__":
     #main()
     #train_models()
     # =========================
-# MAIN EXECUTION
-# =========================
+    # MAIN EXECUTION
+    # =========================
     # Define your file mappings here so the code knows what "concat_hubert_text" maps to
     ftypes = {
     #"concat_hubert_text": "concat_early_fusion.csv", 

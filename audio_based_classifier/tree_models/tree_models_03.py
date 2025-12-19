@@ -19,7 +19,11 @@ import lightgbm as lgb
 import pandas as pd
 from catboost import CatBoostClassifier
 from audio_based_classifier.tree_models.utils import ModelPipeline
-from audio_based_classifier import project_utils as utils
+try:
+    from audio_based_classifier import project_utils as utils
+
+except ImportError:
+    import project_utils as utils
 
 logging.basicConfig(level=logging.INFO)
 
@@ -316,8 +320,9 @@ def run_experiment(data_path,metrics_path,save_models=False,model_type="lightgbm
     
 
 if __name__ == "__main__":
-    
-    run_experiment(None, model_type="lightgbm", number_of_trials=500)
+    # run using python -m audio_based_classifier.tree_models.tree_models_03
+    metrics_path="metrics_tree_models.csv"
+    run_experiment(None,metrics_path, model_type="lightgbm", number_of_trials=500)
 
     
     

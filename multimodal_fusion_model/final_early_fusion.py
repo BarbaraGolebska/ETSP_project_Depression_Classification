@@ -18,9 +18,12 @@ def main():
     # Call audio-based baseline
     #audio_baseline_main(ftypes, oversampling_methods, save_path="early_fusion_results.csv")
 
-    # Best tree models
-    data_path = "expertk_hubert_text_concat_early_fusion.csv"
-    metrics_path = "BORRAR_tree_models_results.csv"
+    # try with hubert + text + expertk
+    data_path = "EF_hubert_text_expertk.csv"
+    # try with hubert + text 
+    data_path = "EF_hubert_text_expertk.csv"
+    
+    metrics_path = "tree_models_results.csv"
 
     audio_tree_models_main(data_path,metrics_path,False, model_type="lightgbm", number_of_trials=500 )
     
