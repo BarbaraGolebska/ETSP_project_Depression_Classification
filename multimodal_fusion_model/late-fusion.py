@@ -304,10 +304,19 @@ def main():
 
     best_weights = study.best_params
     print(best_weights)
+    
+    hard_weighted_predictions, soft_weighted_predictions = weighted_vote(predictions_dict_test, model_weights)
+    print("\n[TEST] Late fusion with equal weights")
+    report = classification_report(y_test_text, hard_weighted_predictions)
+    print(report)
+    # confusion matrix
+    disp = ConfusionMatrixDisplay.from_predictions(y_test_text, hard_weighted_predictions)
+    plt.show()
 
     hard_weighted_predictions, soft_weighted_predictions = weighted_vote(predictions_dict_test, best_weights)
 
     # get results
+    print("\n[TEST] Late fusion with optimized weights")
     report = classification_report(y_test_text, hard_weighted_predictions)
     print(report)
     # confusion matrix
