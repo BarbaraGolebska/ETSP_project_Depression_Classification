@@ -6,7 +6,7 @@ import csv
 import torch
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import confusion_matrix, roc_auc_score
-from imblearn.over_sampling import RandomOverSampler, SMOTE, BorderlineSMOTE
+from imblearn.over_sampling import RandomOverSampler, SMOTE, BorderlineSMOTE, ADASYN
 
 # =========================
 # REPRODUCIBILITY
@@ -68,6 +68,8 @@ def get_oversampler(name, seed=42):
         return SMOTE(random_state=seed)
     elif name == "BorderlineSMOTE":
         return BorderlineSMOTE(random_state=seed)
+    elif name == "ADASYN":
+        return ADASYN(random_state=seed)
     return None
 
 # =========================
