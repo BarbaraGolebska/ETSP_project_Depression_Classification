@@ -20,9 +20,10 @@ from tokenizer import nltk_sentence_tokenize as sent_tokenize
 tqdm.pandas() # add progress_apply to pandas to show progress bars
 
 RESULTS_DIR = "./results"
+EMBEDDINGS_PATH = "../data/processed/text_embeddings.parquet"
 
 OPTUNA_N_TRIALS = 1000
-OPTUNA_STORAGE_PATH = "./embeddings-based_optuna_journal_storage.log"
+OPTUNA_STORAGE_PATH = "./optuna/embeddings-based_optuna_journal_storage.log"
 # deterministic pruner (median over previous trials)
 OPTUNA_PRUNER = optuna.pruners.MedianPruner(
     n_warmup_steps=1,   # don't prune before at least 1 reported step
@@ -309,10 +310,16 @@ def save_results(models, metrics):
 
 def main():
     df = load_dataset()
-    embeddings_df = build_embeddings(df, text_col="text", emb_col="embedding")
-    print("INFO: Embeddings built.")
-    # save embeddings into a file
-    embeddings_df.to_csv("../data/processed/embeddings.csv")
+    # check if embeddings already exist
+    if Path(EMBEDDINGS_PATH).is_file():
+        print(f"INFO: Loading existing embeddings from {EMBEDDINGS_PATH}...")
+        embeddings_df = pd.read_parquet(EMBEDDINGS_PATH)
+    else:
+        embeddings_df = build_embeddings(df, text_col="text", emb_col="embedding")
+        print("INFO: Embeddings built.")
+        # save embeddings into a file in parquet format
+        embeddings_df.to_parquet(EMBEDDINGS_PATH)
+        print(f"INFO: Embeddings saved to {EMBEDDINGS_PATH}.")
 
     train_df, dev_df, test_df = split(embeddings_df)
     X_train, y_train = extract(train_df)

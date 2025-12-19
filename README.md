@@ -1,6 +1,6 @@
 # Automatic Detection of Psychological Conditions from Clinical Interviews
 
-This project focuses on the automatic detection of psychological conditions such as PTSD and depression using interview transcripts and audio data. 
+This project focuses on the automatic detection of depression using interview transcripts and audio data. 
 
 ## Table of Contents
 - [Data](#data)
@@ -15,7 +15,7 @@ We utilize the **E-DAIC dataset**, a component of the DAIC Corpus, which feature
 - **Virtual Interviewer**: Interviews conducted by an animated virtual interviewer called Ellie
 - **Multimodal Recordings**: Audio recordings with extracted acoustic features
 - **Text Transcripts**: Complete utterance transcriptions with timestamps and speaker labels
-- **Clinical Labels**: PHQ-8 scores for depression and PTSD annotations
+- **Clinical Labels**: PHQ-8 scores for depression
 
 ## Methodology
 

@@ -14,9 +14,10 @@ from tqdm import tqdm
 from tokenizer import nltk_sentence_tokenize as sent_tokenize
 
 RESULTS_DIR = "./results"
+EMBEDDINGS_PATH = "../data/processed/bilstm_attn_embeddings.joblib"
 
 OPTUNA_N_TRIALS = 30
-OPTUNA_STORAGE_PATH = "./bilstm_attn_optuna_journal_storage.log"
+OPTUNA_STORAGE_PATH = "./optuna/bilstm_attn_optuna_journal_storage.log"
 # deterministic pruner (median over previous trials)
 OPTUNA_PRUNER = optuna.pruners.MedianPruner(
     n_warmup_steps=1,   # don't prune before at least 1 reported step
@@ -532,7 +533,7 @@ def save_results(models, metrics):
 
 def main():
     df = load_dataset()
-    embeddings_cache = Path("../data/processed/bilstm_attn_embeddings.joblib")
+    embeddings_cache = Path(EMBEDDINGS_PATH)
     if embeddings_cache.exists():
         print("INFO: Loading cached embeddings...")
         embeddings_df = joblib.load(embeddings_cache)

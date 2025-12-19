@@ -789,3 +789,22 @@
 {"op_code":5,"worker_id":"45a43491-c774-4f10-b109-828d3a8f5a9e-8372506432","trial_id":99,"param_name":"nb_alpha","param_value_internal":0.1769092272588759,"distribution":"{\"name\": \"FloatDistribution\", \"attributes\": {\"step\": null, \"low\": 0.001, \"high\": 10.0, \"log\": true}}"}
 {"op_code":7,"worker_id":"45a43491-c774-4f10-b109-828d3a8f5a9e-8372506432","trial_id":99,"step":1,"intermediate_value":0.641025641025641}
 {"op_code":6,"worker_id":"45a43491-c774-4f10-b109-828d3a8f5a9e-8372506432","trial_id":99,"state":2,"values":[0.641025641025641],"datetime_complete":"2025-11-12T17:05:34.973114"}
+{"op_code":0,"worker_id":"aa5d85f3-f093-4d4d-8bba-d7dd5d9cacc2-8372506432","study_name":"tfidf_lr","directions":[2]}
+{"op_code":4,"worker_id":"aa5d85f3-f093-4d4d-8bba-d7dd5d9cacc2-8372506432","study_id":0,"datetime_start":"2025-12-19T17:57:28.606462"}
+{"op_code":5,"worker_id":"aa5d85f3-f093-4d4d-8bba-d7dd5d9cacc2-8372506432","trial_id":100,"param_name":"v_min_df","param_value_internal":2.0,"distribution":"{\"name\": \"IntDistribution\", \"attributes\": {\"log\": false, \"step\": 1, \"low\": 1, \"high\": 3}}"}
+{"op_code":5,"worker_id":"aa5d85f3-f093-4d4d-8bba-d7dd5d9cacc2-8372506432","trial_id":100,"param_name":"v_ngram_max","param_value_internal":1.0,"distribution":"{\"name\": \"IntDistribution\", \"attributes\": {\"log\": false, \"step\": 1, \"low\": 1, \"high\": 2}}"}
+{"op_code":5,"worker_id":"aa5d85f3-f093-4d4d-8bba-d7dd5d9cacc2-8372506432","trial_id":100,"param_name":"m_C","param_value_internal":6.612637856381754,"distribution":"{\"name\": \"FloatDistribution\", \"attributes\": {\"step\": null, \"low\": 0.0001, \"high\": 10.0, \"log\": true}}"}
+{"op_code":7,"worker_id":"aa5d85f3-f093-4d4d-8bba-d7dd5d9cacc2-8372506432","trial_id":100,"step":1,"intermediate_value":0.7582417582417582}
+{"op_code":7,"worker_id":"aa5d85f3-f093-4d4d-8bba-d7dd5d9cacc2-8372506432","trial_id":100,"step":2,"intermediate_value":0.7610653235653235}
+{"op_code":7,"worker_id":"aa5d85f3-f093-4d4d-8bba-d7dd5d9cacc2-8372506432","trial_id":100,"step":3,"intermediate_value":0.724969474969475}
+{"op_code":6,"worker_id":"aa5d85f3-f093-4d4d-8bba-d7dd5d9cacc2-8372506432","trial_id":100,"state":1,"values":[0.724969474969475],"datetime_complete":"2025-12-19T17:57:39.486237"}
+{"op_code":0,"worker_id":"8de72e24-5da7-401a-aa9a-e59d4bad317f-8372506432","study_name":"nbweight_lr","directions":[2]}
+{"op_code":4,"worker_id":"8de72e24-5da7-401a-aa9a-e59d4bad317f-8372506432","study_id":1,"datetime_start":"2025-12-19T17:57:39.491952"}
+{"op_code":5,"worker_id":"8de72e24-5da7-401a-aa9a-e59d4bad317f-8372506432","trial_id":101,"param_name":"v_min_df","param_value_internal":3.0,"distribution":"{\"name\": \"IntDistribution\", \"attributes\": {\"log\": false, \"step\": 1, \"low\": 1, \"high\": 3}}"}
+{"op_code":5,"worker_id":"8de72e24-5da7-401a-aa9a-e59d4bad317f-8372506432","trial_id":101,"param_name":"v_ngram_max","param_value_internal":2.0,"distribution":"{\"name\": \"IntDistribution\", \"attributes\": {\"log\": false, \"step\": 1, \"low\": 1, \"high\": 2}}"}
+{"op_code":5,"worker_id":"8de72e24-5da7-401a-aa9a-e59d4bad317f-8372506432","trial_id":101,"param_name":"m_C","param_value_internal":5.718254063817665,"distribution":"{\"name\": \"FloatDistribution\", \"attributes\": {\"step\": null, \"low\": 0.0001, \"high\": 10.0, \"log\": true}}"}
+{"op_code":5,"worker_id":"8de72e24-5da7-401a-aa9a-e59d4bad317f-8372506432","trial_id":101,"param_name":"nb_alpha","param_value_internal":0.006624661931676361,"distribution":"{\"name\": \"FloatDistribution\", \"attributes\": {\"step\": null, \"low\": 0.001, \"high\": 10.0, \"log\": true}}"}
+{"op_code":7,"worker_id":"8de72e24-5da7-401a-aa9a-e59d4bad317f-8372506432","trial_id":101,"step":1,"intermediate_value":0.6868131868131868}
+{"op_code":7,"worker_id":"8de72e24-5da7-401a-aa9a-e59d4bad317f-8372506432","trial_id":101,"step":2,"intermediate_value":0.7243589743589745}
+{"op_code":7,"worker_id":"8de72e24-5da7-401a-aa9a-e59d4bad317f-8372506432","trial_id":101,"step":3,"intermediate_value":0.7163715913715913}
+{"op_code":6,"worker_id":"8de72e24-5da7-401a-aa9a-e59d4bad317f-8372506432","trial_id":101,"state":1,"values":[0.7163715913715913],"datetime_complete":"2025-12-19T17:57:49.355863"}

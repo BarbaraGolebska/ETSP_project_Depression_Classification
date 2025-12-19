@@ -1,17 +1,17 @@
 Embeddings + MLP:
-Best hyperparameters: {'n_layers': 1, 'n_units_l0': 48, 'activation': 'logistic', 'solver': 'adam', 'alpha': 0.07235343136192071, 'learning_rate_init': 0.006029641726179566}
-Best threshold: 0.4316
-Youden's J statistic: 0.3183
+Best hyperparameters: {'n_layers': 1, 'n_units_l0': 48, 'activation': 'logistic', 'solver': 'adam', 'alpha': 0.057621071214204844, 'learning_rate_init': 0.0031346622799235347}
+Best threshold: 0.5012
+Youden's J statistic: 0.5490
 
 Classification Report:
               precision    recall  f1-score   support
 
-           0       0.89      0.44      0.59        39
-           1       0.41      0.88      0.56        17
+           0       0.93      0.67      0.78        39
+           1       0.54      0.88      0.67        17
 
-    accuracy                           0.57        56
-   macro avg       0.65      0.66      0.57        56
-weighted avg       0.75      0.57      0.58        56
+    accuracy                           0.73        56
+   macro avg       0.73      0.77      0.72        56
+weighted avg       0.81      0.73      0.74        56
 
 
 Embeddings + CatBoost:
@@ -47,7 +47,7 @@ weighted avg       0.79      0.70      0.71        56
 
 
 Comparison of embeddings-based models on test set:
-DeLong p-value = 0.6587
-MLP AUC = 0.8024 (95% CI: 0.6591 - 0.9220)
+DeLong p-value = 0.3889
+MLP AUC = 0.8386 (95% CI: 0.7045 - 0.9478)
 CatBoost AUC = 0.8160 (95% CI: 0.6742 - 0.9388)
 LR AUC = 0.8326 (95% CI: 0.6992 - 0.9412)
