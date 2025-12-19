@@ -1,7 +1,7 @@
 # Multimodal Fusion
 
 
-## EARLY FUSION
+# EARLY FUSION
 
 This folder contains scripts for performing **early fusion** of audio and text features, training multimodal classifiers, and formatting evaluation results. The pipeline focuses on combining the best-performing unimodal models to improve patient-level prediction.
 
@@ -28,6 +28,15 @@ To run, use python -m multimodal_fusion_model.early_fusion_LR_TM command
 
 ---
 
+### `early_fusion_MLP.py`
+Trains MLP classifier over fused features wih dimentionality reduction.
+
+**Key functionality:**
+- Trains MLP classifier on the fused feature set with reduced dimentionality.
+- Uses the fused data from `concat_features.py` to leverage complementary information from multiple modalities.
+
+---
+
 ### `describe_results.py`
 Formats and organizes final evaluation metrics for multimodal models.
 
@@ -38,17 +47,23 @@ Formats and organizes final evaluation metrics for multimodal models.
 
 ---
 
+### `utils.py` and `utils_MLP.py`
+Contains helper functions. 
+
+---
+
 ## Typical Workflow
 
 1. **Perform early fusion**
-   - Run `concat_features.py` to generate a combined feature set for the desired modalities.
+   - Run `python concat_features.py` to generate a combined feature set for the desired modalities.
 
 2. **Train multimodal models**
-   - Run `early_fusion_LR_TM.py` using the fused features.
-   - Trains Logistic Regression and LightGBM models with optimized hyperparameters.
+   - Run `python -m multimodal_fusion_model.early_fusion_LR_TM`;
+   - Run `python early_fusion_MLP.py`;
+   - Trains Logistic Regression and LightGBM and MLP models with optimized hyperparameters.
 
 3. **Format and review results**
-   - Run `describe_results.py` to summarize metrics and detect the best-performing models.
+   - Run `python describe_results.py` to summarize metrics and detect the best-performing models.
 
 
-## LATE FUSION
+# LATE FUSION
