@@ -5,7 +5,6 @@ import numpy as np
 from sklearn.model_selection import GroupKFold
 from sklearn.metrics import roc_auc_score
 import project_utils as utils
-import joblib
 
 # =========================
 # PYTORCH HELPERS
@@ -84,22 +83,12 @@ def objective(trial, device, X_np, y_np, groups, kf, oversampler_name):
 # MAIN FUNCTION
 # =========================
 ftypes = {
-    #"expert_k": "ExpertK_aggregated_features.csv",
-    #"bow": "BoW_aggregated_features.csv",
-    #"deep_rep": "DeepR_aggregated_features.csv",
-    "hubert": "hubert_aggregated_embeddings.csv",
-    #"all": "merged_all_features.csv",
-    #"all_incl_hubert": "merged_all_features_hubert.csv"
-    #"ek_egemaps":"ek_egemaps_aggregated_features.csv",
-    #"ek_mfcc":"ek_mfcc_aggregated_features.csv"
+
+    #"concat_hubert_text": "concat_early_fusion.csv",
+    "concat_hubert_expertk_text": "expertk_hubert_text_concat_early_fusion.csv"
 }
 
-oversampling_methods = [
-                        # "None", 
-                        "RandomOverSampler", 
-                        # "SMOTE", 
-                        # "BorderlineSMOTE"
-                        ]
+oversampling_methods = ["None", "RandomOverSampler", "SMOTE", "BorderlineSMOTE"]
 #oversampling_methods = ["None"]
 
 
@@ -160,7 +149,7 @@ def main():
                 model_name="Baseline_Linear",      
                 data=ftype,
                 oversampler=oversampler_name,
-                save_path="800_baseline_results.csv"
+                save_path="early_fusion_results.csv"
             )
 
 def train_best_model():
@@ -196,8 +185,7 @@ def train_best_model():
             y_train_t = torch.tensor(y_train_os, dtype=torch.float32).to(device)
 
             # C. Initialize & Train
-            #best = {'lr': 0.09840764582498135, 'optimizer': 'Adam', 'epochs': 30} #youden 0.51
-            best = {'lr': 0.027161129658907632, 'optimizer': 'Adam', 'epochs': 20} #youden 0.56
+            best = {'lr': 0.09840764582498135, 'optimizer': 'Adam', 'epochs': 30}
             final_model = create_model(X_train_t.shape[1], device)
             optimizer = getattr(torch.optim, best["optimizer"])(final_model.parameters(), lr=best["lr"])
             criterion = nn.BCEWithLogitsLoss()
@@ -205,13 +193,13 @@ def train_best_model():
             for _ in range(best["epochs"]):
                 train_epoch(final_model, optimizer, criterion, X_train_t, y_train_t)
 
-            # # D. SAVE THE MODEL (.pkl)
-            # model_path = f"audio_based_classifier/models/{ftype}_{oversampler_name}_baseline.pkl"
-            # torch.save(final_model.state_dict(), model_path)
-            # print(f"Saved model to {model_path}")
+            # D. SAVE THE MODEL (.pkl)
+            model_path = f"audio_based_classifier/models/{ftype}_{oversampler_name}_baseline.pkl"
+            torch.save(final_model.state_dict(), model_path)
+            print(f"Saved model to {model_path}")
 
             # 3. Evaluate on Dev Set
-            auc, best_thr = utils.evaluate_and_report(
+            utils.evaluate_and_report(
                 model=final_model, 
                 X_dev=X_test, 
                 y_dev=y_test, 
@@ -223,13 +211,6 @@ def train_best_model():
                 save_path="test_baseline_results.csv"
             )
 
-            wrapper = utils.BaselineLinearWrapper(final_model.cpu(), best_thr)
-
-            model_path = "../audio_based_classifier/results/hubert_None_baseline.pkl"
-            joblib.dump(wrapper, model_path)
-            print(f"Saved joblib-wrapped baseline to {model_path}")
-
 
 if __name__ == "__main__":
-    #main()
-    train_best_model()
+    main()

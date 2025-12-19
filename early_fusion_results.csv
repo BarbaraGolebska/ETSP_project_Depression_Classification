@@ -1,0 +1,15 @@
+Model_Name,Data,Oversampler,AUC,Youden_Index,Best_Threshold,TN,FP,FN,TP,False_Negative_IDs,best_params,test_auc,test_youden,test_precision,test_recall,test_f1,test_TN,test_FP,test_FN,test_TP
+Baseline_Linear,concat_hubert_text,,0.7209,0.4748,0.061,24,19,1,11,[448],"{'lr': 0.02379104676109112, 'optimizer': 'Adam', 'epochs': 30}",0.6839,0.2071,0.3871,0.75,0.5106,16,19,4,12
+Baseline_Linear,concat_hubert_text,RandomOverSampler,0.7016,0.3605,0.679,37,6,6,6,"[347, 350, 381, 402, 412, 448]","{'lr': 0.0008179499475211679, 'optimizer': 'Adam', 'epochs': 20}",0.8,0.4643,0.5455,0.75,0.6316,25,10,4,12
+Baseline_Linear,concat_hubert_text,SMOTE,0.7229,0.405,0.216,21,22,1,11,[347],"{'lr': 0.001730370606683101, 'optimizer': 'Adam', 'epochs': 30}",0.7589,0.2232,0.375,0.9375,0.5357,10,25,1,15
+Baseline_Linear,concat_hubert_text,BorderlineSMOTE,0.7035,0.3585,0.246,19,24,1,11,[347],"{'lr': 0.0008179499475211679, 'optimizer': 'Adam', 'epochs': 20}",0.8054,0.2286,0.3721,1.0,0.5424,8,27,0,16
+Baseline_Linear,concat_hubert_text,,0.7035,0.4012,0.908,28,15,3,9,"[350, 412, 448]","{'lr': 0.03324272198081779, 'optimizer': 'Adam', 'epochs': 20}",0.6554,0.1964,0.4,0.625,0.4878,20,15,6,10
+Baseline_Linear,concat_hubert_text,RandomOverSampler,0.7074,0.4109,0.553,32,11,4,8,"[347, 350, 381, 412]","{'lr': 0.0024351965016039955, 'optimizer': 'Adam', 'epochs': 10}",0.8054,0.2643,0.4138,0.75,0.5333,18,17,4,12
+Baseline_Linear,concat_hubert_text,SMOTE,0.7093,0.4109,0.508,32,11,4,8,"[347, 350, 381, 412]","{'lr': 0.0023860215312224765, 'optimizer': 'Adam', 'epochs': 10}",0.8214,0.4125,0.4815,0.8125,0.6047,21,14,3,13
+Baseline_Linear,concat_hubert_text,BorderlineSMOTE,0.7035,0.3585,0.246,19,24,1,11,[347],"{'lr': 0.0008179499475211679, 'optimizer': 'Adam', 'epochs': 20}",0.8054,0.2286,0.3721,1.0,0.5424,8,27,0,16
+Baseline_Linear,concat_hubert_expertk_text,,0.6938,0.3605,0.68,37,6,6,6,"[347, 350, 381, 402, 412, 448]","{'lr': 0.002324433859862855, 'optimizer': 'Adam', 'epochs': 10}",0.7643,0.4304,0.55,0.6875,0.6111,26,9,5,11
+Baseline_Linear,concat_hubert_expertk_text,RandomOverSampler,0.7016,0.4341,0.539,33,10,4,8,"[347, 350, 381, 412]","{'lr': 0.0028484808944687443, 'optimizer': 'Adam', 'epochs': 10}",0.8089,0.2643,0.4138,0.75,0.5333,18,17,4,12
+Baseline_Linear,concat_hubert_expertk_text,SMOTE,0.7287,0.4574,0.528,34,9,4,8,"[347, 350, 381, 412]","{'lr': 0.0026435207985154776, 'optimizer': 'Adam', 'epochs': 10}",0.8446,0.3554,0.4483,0.8125,0.5778,19,16,3,13
+Baseline_Linear,concat_hubert_expertk_text,BorderlineSMOTE,0.7267,0.4109,0.546,32,11,4,8,"[347, 350, 381, 412]","{'lr': 0.002499602731586396, 'optimizer': 'Adam', 'epochs': 10}",0.8464,0.3554,0.4483,0.8125,0.5778,19,16,3,13
+Baseline_Linear,concat_hubert_text,ADASYN,0.7403,0.4341,0.519,33,10,4,8,"[347, 350, 381, 412]","{'lr': 0.00238984928485181, 'optimizer': 'Adam', 'epochs': 10}",0.8018,0.3268,0.4333,0.8125,0.5652,18,17,3,13
+Baseline_Linear,concat_hubert_expertk_text,ADASYN,0.7132,0.4205,0.608,36,7,5,7,"[347, 350, 381, 412, 448]","{'lr': 0.001278520591834003, 'optimizer': 'Adam', 'epochs': 20}",0.8036,0.3214,0.4444,0.75,0.5581,20,15,4,12

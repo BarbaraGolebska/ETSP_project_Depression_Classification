@@ -27,15 +27,19 @@ def main():
             #"bow_egemaps": f"{pid}_BoAW_openSMILE_2.3.0_eGeMAPS.csv",
             #"bow_mfcc": f"{pid}_BoAW_openSMILE_2.3.0_MFCC.csv",
             #"densenet201": f"{pid}_densenet201.csv",
-            #"vgg16": f"{pid}_vgg16.csv",
+            "vgg16": f"{pid}_vgg16.csv",
             #"ek_egemaps":f"{pid}_OpenSMILE2.3.0_egemaps.csv",
-            "ek_mfcc":f"{pid}_OpenSMILE2.3.0_mfcc.csv"
+            #"ek_mfcc":f"{pid}_OpenSMILE2.3.0_mfcc.csv"
         }
 
         patient_summary = []
         for ftype, path in ftypes.items():
             if ftype in ["ek_egemaps", "ek_mfcc"]:
                 df = pd.read_csv(f"data/raw/features/{path}",  sep=';')
+
+            elif ftype in ["densenet201", "vgg16"]:
+                df = pd.read_csv(f"data/raw/features/{path}",  sep=',', decimal='.')
+                
 
             else:
                 df = pd.read_csv(f"data/raw/features/{path}", sep='[,;]', engine='python', header=None)
@@ -53,7 +57,7 @@ def main():
                                     on="participant_id", how="inner")
     
     data = data.set_index("participant_id")
-    data.to_csv("data/processed/audio/ek_mfcc/ek_mfcc_aggregated_features.csv")
+    data.to_csv("data/processed/VGG16_aggregated_features.csv")
 
 if __name__ == "__main__":
     main()

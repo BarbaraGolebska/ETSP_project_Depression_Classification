@@ -1,6 +1,7 @@
 import numpy as np
 import json
 import joblib
+import pandas as pd
 from pathlib import Path
 from datetime import datetime
 import logging
@@ -17,7 +18,8 @@ from sklearn.base import BaseEstimator, TransformerMixin
 
 import lightgbm as lgb
 from catboost import CatBoostClassifier
-from audio_based_classifier.tree_models.utils import ModelPipeline
+#rom tree_models.utils import ModelPipeline
+import project_utils as utils
 
 logging.basicConfig(level=logging.INFO)
 
@@ -112,10 +114,12 @@ def run_experiment(model_type="lightgbm", number_of_trials=20):
         "adasyn": ADASYN(random_state=42)
     }
 
-    root_dir = Path("../audio_based_classifier/tree_models/experiments")
+    
+    root_dir = Path("../data/results")
     root_dir.mkdir(parents=True, exist_ok=True)
 
-    out_dir = Path("../data/processed/audio/lightgbm_smote_hubert_mfcc_egemaps")
+    """
+    out_dir = Path("../data/vectors/new")
 
     X_train = np.load(out_dir / "X_train.npy")
     y_train = np.load(out_dir / "y_train.npy")
@@ -123,6 +127,16 @@ def run_experiment(model_type="lightgbm", number_of_trials=20):
     y_dev = np.load(out_dir / "y_dev.npy")
     X_test = np.load(out_dir / "X_test.npy")
     y_test = np.load(out_dir / "y_test.npy")
+    """
+    # Path setup
+    data_path = "expertk_hubert_text_concat_early_fusion.csv"
+
+    # Load from CSV instead of .npy files
+    X_train, y_train, X_dev, y_dev, df_train, df_dev = utils.load_processed_data(
+        data_path
+    )
+
+    X_test, y_test, df_test = utils.load_test_data(data_path)
 
     X_train = impute_nans(X_train)
     X_dev = impute_nans(X_dev)
@@ -234,12 +248,21 @@ def run_experiment(model_type="lightgbm", number_of_trials=20):
         recall_test = recall_score(y_test, test_labels)
         f1_test = f1_score(y_test, test_labels)
 
-        sampler_dir = run_dir / sampler_name
-        sampler_dir.mkdir(parents=True, exist_ok=True)
+        #sampler_dir = run_dir / sampler_name
+        #sampler_dir.mkdir(parents=True, exist_ok=True)
         best_youden = max(best_youden, test_youden)
         metrics = {
             "sampler": sampler_name,
             "best_threshold": float(best_threshold),
+            "model_type": model_type,
+            "data": data_path,
+
+            "dev_auc": float(auc),
+            "dev_youden": dev_youden,
+            "dev_confusion": [int(tn), int(fp), int(fn), int(tp)],
+            "dev_precision": float(precision),
+            "dev_recall": float(recall),
+            "dev_f1": float(f1),
 
             "test_auc": float(auc_test),
             "test_youden": test_youden,
@@ -250,19 +273,55 @@ def run_experiment(model_type="lightgbm", number_of_trials=20):
 
             "best_params": best_params
         }
-
-        with open(sampler_dir / "metrics.json", "w") as f:
+        sampler_dir = "./multimodal_fusion_model/early_fusion_all_feat/"+model_type+"/"
+        with open(sampler_dir+"metrics.json", "w") as f:
             json.dump(metrics, f, indent=4)
+
+
+        # ----------------
+        # Flatten for CSV
+        # ----------------
+        flat_metrics = {
+            **{k: v for k, v in metrics.items()
+            if k not in ["dev_confusion", "test_confusion", "best_params"]},
+
+            "dev_tn": tn,
+            "dev_fp": fp,
+            "dev_fn": fn,
+            "dev_tp": tp,
+
+            "test_tn": tn2,
+            "test_fp": fp2,
+            "test_fn": fn2,
+            "test_tp": tp2,
+
+            **{f"param_{k}": v for k, v in best_params.items()}
+        }
+
+        df = pd.DataFrame([flat_metrics])
+
+        # ----------------
+        # Write / append CSV
+        # ----------------
+        csv_path = Path(sampler_dir+"metrics.csv")
+
+        df.to_csv(
+            csv_path,
+            mode="a" if csv_path.exists() else "w",
+            header=not csv_path.exists(),
+            index=False
+        )
+
             
 
         if model_type == "lightgbm":
-            final_model.save_model(sampler_dir / "model_lightgbm.txt")
+            final_model.save_model(sampler_dir+"model_lightgbm.txt")
         else:
-            final_model.save_model(sampler_dir / "model_catboost.cbm")
+            final_model.save_model( sampler_dir+"model_catboost.cbm")
 
-        joblib.dump(scaler, sampler_dir / "scaler.pkl")
-        np.save(sampler_dir / "dev_preds.npy", dev_preds)
-        np.save(sampler_dir / "test_preds.npy", test_preds)
+        joblib.dump(scaler,sampler_dir+"scaler.pkl")
+        np.save(sampler_dir+"dev_preds.npy", dev_preds)
+        np.save(sampler_dir+"test_preds.npy", test_preds)
 
     logging.info("Training complete")
     
@@ -270,7 +329,8 @@ def run_experiment(model_type="lightgbm", number_of_trials=20):
 if __name__ == "__main__":
     
     run_experiment(model_type="lightgbm", number_of_trials=500)
-
+    run_experiment(model_type="catboost", number_of_trials=500)
+    
     
     
 
