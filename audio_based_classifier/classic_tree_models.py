@@ -116,14 +116,14 @@ def objective(trial, X, y, groups, kf, oversampler_name, model_type):
 # MAIN
 # =========================
 ftypes = {
-    "expert_k": "ExpertK_aggregated_features.csv",
-    "bow": "BoW_aggregated_features.csv",
-    "deep_rep": "DeepR_aggregated_features.csv",
+    # "expert_k": "ExpertK_aggregated_features.csv",
+    # "bow": "BoW_aggregated_features.csv",
+    # "deep_rep": "DeepR_aggregated_features.csv",
     "hubert": "hubert_aggregated_embeddings.csv",
-    "all": "merged_all_features.csv",
-    "all_incl_hubert": "merged_all_features_hubert.csv",
-    "ek_egemaps":"ek_egemaps_aggregated_features.csv",
-    "ek_mfcc":"ek_mfcc_aggregated_features.csv"
+    # "all": "merged_all_features.csv",
+    # "all_incl_hubert": "merged_all_features_hubert.csv",
+    # "ek_egemaps":"ek_egemaps_aggregated_features.csv",
+    # "ek_mfcc":"ek_mfcc_aggregated_features.csv"
 }
 
 oversampling_methods = ["None","RandomOverSampler", "SMOTE", "BorderlineSMOTE"]

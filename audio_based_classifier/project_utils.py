@@ -22,8 +22,23 @@ def set_seed(seed=1):
 # =========================
 # DATA LOADING
 # =========================
+
+def get_df(filename, base_path):
+    try:
+        df = pd.read_csv(f"{base_path}{filename}")
+    except:
+        try:
+            base_path = "../data/processed/"
+            df = pd.read_csv(f"{base_path}{filename}")
+        except:
+            base_path = "./data/processed/"
+            df = pd.read_csv(f"{base_path}{filename}")
+    return df
+
+
 def load_processed_data(filename, base_path="../data/processed/audio/hubert/"):
-    df = pd.read_csv(f"{base_path}{filename}")
+    df = get_df(filename, base_path)
+
     df_train = df[df["split"] == "train"]
     df_dev = df[df["split"] == "dev"]
 
@@ -40,7 +55,7 @@ def load_processed_data(filename, base_path="../data/processed/audio/hubert/"):
 
 
 def load_test_data(filename, base_path="../data/processed/audio/hubert/"):
-    df = pd.read_csv(f"{base_path}{filename}")
+    df = get_df(filename, base_path)
     df_train = df[df["split"] == "train"]
     df_test = df[df["split"] == "dev"]   # NEW
 

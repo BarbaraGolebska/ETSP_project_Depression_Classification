@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 from pathlib import Path
+import os
+os.chdir(Path(__file__).resolve().parents[1])
 import logging
 logging.basicConfig(level=logging.INFO)
 
@@ -22,7 +24,7 @@ for _, row in splits.iterrows():
     label = row[label_col]
     split = row["split"]
 
-    emb_path = Path(f"../data/processed/{pid}_embedding.npy")
+    emb_path = Path(f"../data/raw/features/{pid}_hubert_embedding.npy")
     eg_path = Path(f"../data/raw/features/{pid}_OpenSMILE2.3.0_egemaps.csv")
     mfcc_path = Path(f"../data/raw/features/{pid}_OpenSMILE2.3.0_mfcc.csv")
 

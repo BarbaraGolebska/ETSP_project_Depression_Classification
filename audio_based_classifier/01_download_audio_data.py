@@ -2,6 +2,8 @@ import os
 import zipfile
 import gdown
 from tqdm import tqdm
+from pathlib import Path
+os.chdir(Path(__file__).resolve().parents[1])
 
 
 # ----------------------- CONFIG --------------------------

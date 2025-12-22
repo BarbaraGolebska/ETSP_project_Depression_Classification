@@ -2,7 +2,8 @@ import numpy as np
 import pandas as pd 
 import os
 from sklearn.model_selection import train_test_split
-
+from pathlib import Path
+os.chdir(Path(__file__).resolve().parents[1])
 
 
 def aggregate_features(df):
@@ -75,7 +76,7 @@ def preprocess_hubert():
     print("Saved CSV to:", output_path)
 
 
-def main():
+def main(chosen_ftype):
     labels_df = pd.read_csv('data/raw/labels/detailed_labels.csv').rename(columns={"Participant": "participant_id", "Depression_label": "target_depr", "PTSD_label": "target_ptsd"})
     labels_df["participant_id"] = labels_df["participant_id"].astype(str)
 
@@ -85,14 +86,15 @@ def main():
     agg_features = []
     for pid in participant_list:
         print(f"Processing patient: {pid}")
-        ftypes = {
-            #"bow_egemaps": f"{pid}_BoAW_openSMILE_2.3.0_eGeMAPS.csv",
-            #"bow_mfcc": f"{pid}_BoAW_openSMILE_2.3.0_MFCC.csv",
-            #"densenet201": f"{pid}_densenet201.csv",
+        all_ftypes = {
+            "bow_egemaps": f"{pid}_BoAW_openSMILE_2.3.0_eGeMAPS.csv",
+            "bow_mfcc": f"{pid}_BoAW_openSMILE_2.3.0_MFCC.csv",
+            "densenet201": f"{pid}_densenet201.csv",
             "vgg16": f"{pid}_vgg16.csv",
-            #"ek_egemaps":f"{pid}_OpenSMILE2.3.0_egemaps.csv",
-            #"ek_mfcc":f"{pid}_OpenSMILE2.3.0_mfcc.csv"
+            "ek_egemaps":f"{pid}_OpenSMILE2.3.0_egemaps.csv",
+            "ek_mfcc":f"{pid}_OpenSMILE2.3.0_mfcc.csv"
         }
+        ftypes = {ftype:path for ftype, path in all_ftypes.items() if ftype == chosen_ftype}
 
         patient_summary = []
         for ftype, path in ftypes.items():
@@ -119,7 +121,10 @@ def main():
                                     on="participant_id", how="inner")
     
     data = data.set_index("participant_id")
-    data.to_csv("data/processed/VGG16_aggregated_features.csv")
+    data.to_csv(f"data/processed/{chosen_ftype}_aggregated_features.csv")
 
 if __name__ == "__main__":
-    main()
+    ftypes_list = ["bow_egemaps", "bow_mfcc", "densenet201", "vgg16", "ek_egemaps", "ek_mfcc"]
+    for ftype in ftypes_list:
+        main(ftype)
+    preprocess_hubert()

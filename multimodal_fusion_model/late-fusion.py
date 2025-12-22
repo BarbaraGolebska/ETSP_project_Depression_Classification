@@ -55,7 +55,7 @@ def extract(df):
     return np.vstack(df["embedding"].to_numpy()), df["target_depr"].astype(int).to_numpy()
 
 def get_text_based_datasets():
-    embeddings_df = pd.read_csv("../data/processed/embeddings.csv", index_col=0,
+    embeddings_df = pd.read_csv(f"{PROJECT_ROOT}/data/processed/embeddings.csv", index_col=0,
                                 converters={"embedding": lambda s:
                                 np.fromstring(s.strip("[]"), sep=" ")})  # make sure embeddings are numpy array
     train_df, dev_df, test_df = split(embeddings_df)
@@ -66,7 +66,7 @@ def get_text_based_datasets():
 
 
 def get_text_based_models():
-    path_to_models = Path("../text_based_classifier/results")
+    path_to_models = Path(f"{PROJECT_ROOT}/text_based_classifier/results")
     # grab all embeddings based models
     model_files = [str(p) for p in path_to_models.glob("embeddings-based_*.pkl")]
     # get the names for the models, which would be the stemmed filenames
@@ -74,7 +74,7 @@ def get_text_based_models():
     # get the models themselves
     models = [joblib.load(model_file) for model_file in model_files]
     # get the thresholds for the models
-    with open("../text_based_classifier/results/embeddings_thresholds.pkl", 'rb') as f:
+    with open(f"{PROJECT_ROOT}/text_based_classifier/results/embeddings_thresholds.pkl", 'rb') as f:
         thresholds_dict = pickle.load(f)
     # assign thresholds in the same order as model_names
     thresholds = [thresholds_dict[model_name] for model_name in model_names]
@@ -108,10 +108,10 @@ def get_audio_based_datasets_lightgbm(model_name):
     
     set_names = ["X_train", "y_train", "X_dev", "y_dev", "X_test", "y_test"]
 
-    return [np.load(f"../data/processed/audio/{model_name}/{set_name}.npy") for set_name in set_names]
+    return [np.load(f"{PROJECT_ROOT}/data/processed/audio/{model_name}/{set_name}.npy") for set_name in set_names]
 
 def get_audio_based_datasets():
-    embeddings_df = pd.read_csv("../data/processed/audio/hubert/hubert_aggregated_embeddings.csv") 
+    embeddings_df = pd.read_csv(f"{PROJECT_ROOT}/data/processed/audio/hubert/hubert_aggregated_embeddings.csv")
     X_train, y_train, X_dev, y_dev, X_test, y_test = load_processed_audio_data(embeddings_df)
     return X_train, y_train, X_dev, y_dev, X_test, y_test
 
@@ -119,7 +119,7 @@ def get_audio_based_models():
     
     # declaring as lists to be able to add other models later
 
-    model_files = ["../audio_based_classifier/results/lightgbm_smote_hubert_mfcc_egemaps.pkl","../audio_based_classifier/results/hubert_None_baseline.pkl"]
+    model_files = [f"{PROJECT_ROOT}/audio_based_classifier/results/lightgbm_smote_hubert_mfcc_egemaps.pkl",f"{PROJECT_ROOT}/audio_based_classifier/results/hubert_None_baseline.pkl"]
     # get the names for the models, which would be the stemmed filenames
     model_names = [Path(f).stem for f in model_files]
     # get the models themselves

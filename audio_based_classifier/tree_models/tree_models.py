@@ -296,7 +296,10 @@ def run_experiment(data_path,metrics_path,save_models=False,model_type="lightgbm
         # ----------------
         # Write / append CSV
         # ----------------
-        csv_path = Path(sampler_dir+metrics_path)
+        try:
+            csv_path = Path(sampler_dir+metrics_path)
+        except:
+            csv_path = Path(str(sampler_dir) + str(metrics_path))
 
         df.to_csv(
             csv_path,

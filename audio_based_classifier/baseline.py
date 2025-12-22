@@ -12,6 +12,10 @@ try:
 except ImportError:
     from . import project_utils as utils
 
+import os
+from pathlib import Path
+os.chdir(Path(__file__).resolve().parents[1])
+
 
 # =========================
 # PYTORCH HELPERS
@@ -90,18 +94,18 @@ def objective(trial, device, X_np, y_np, groups, kf, oversampler_name):
 # MAIN FUNCTION
 # =========================
 ftypes = {
-    "expert_k": "ExpertK_aggregated_features.csv",
-    "bow": "BoW_aggregated_features.csv",
-    "deep_rep": "DeepR_aggregated_features.csv",
-    "hubert": "hubert_aggregated_embeddings.csv",
-    "BOW_MFCC": "BOWMFCC_aggregated_features.csv",
-    "BOW_Egemaps": "BOWEgemaps_aggregated_features.csv",
+    # "expert_k": "ExpertK_aggregated_features.csv",
+    # "bow": "BoW_aggregated_features.csv",
+    # "deep_rep": "DeepR_aggregated_features.csv",
+    # "hubert": "hubert_aggregated_embeddings.csv",
+    # "BOW_MFCC": "BOWMFCC_aggregated_features.csv",
+    # "BOW_Egemaps": "BOWEgemaps_aggregated_features.csv",
     "VGG16": "VGG16_aggregated_features.csv",
-    "DenseNet201": "DenseNet201_aggregated_features.csv",
-    "all": "merged_all_features.csv",
-    "all_incl_hubert": "merged_all_features_hubert.csv",
-    "ek_egemaps":"ek_egemaps_aggregated_features.csv",
-    "ek_mfcc":"ek_mfcc_aggregated_features.csv"
+    # "DenseNet201": "DenseNet201_aggregated_features.csv",
+    # "all": "merged_all_features.csv",
+    # "all_incl_hubert": "merged_all_features_hubert.csv",
+    # "ek_egemaps":"ek_egemaps_aggregated_features.csv",
+    # "ek_mfcc":"ek_mfcc_aggregated_features.csv"
 }
 
 #oversampling_methods = ["None", "RandomOverSampler", "SMOTE", "BorderlineSMOTE"]

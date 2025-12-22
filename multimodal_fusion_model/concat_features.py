@@ -1,13 +1,15 @@
 import numpy as np
 import os
 import pandas as pd
+from pathlib import Path
+os.chdir(Path(__file__).resolve().parents[1])
 
 def load_parquet_embeddings():
     # ==========================================
     # CONFIGURATION
     # ==========================================
     # Path to the input Parquet file (Text Embeddings)
-    INPUT_PARQUET = r"data/processed/embeddings.parquet"
+    INPUT_PARQUET = r"data/processed/text_embeddings.parquet"
 
     # Path to the labels CSV
     LABELS_PATH = r"data/raw/labels/detailed_labels.csv"
@@ -81,7 +83,7 @@ def concat_features_large():
 
     # Load your datasets
     df1 = pd.read_csv("data/processed/text_embeddings_aggregated.csv")
-    df2 = pd.read_csv("data/processed/hubert_aggregated_embeddings.csv")
+    df2 = pd.read_csv("data/processed/audio/hubert/hubert_aggregated_embeddings.csv")
     df3 = pd.read_csv("data/processed/ExpertK_aggregated_features.csv") # this file is the aggregation of OpenSmile mfcc + egemaps
 
 
@@ -148,5 +150,5 @@ def concat_features():
 
 # --- Example of running the model ---
 if __name__ == "__main__":
-
+    load_parquet_embeddings()
     concat_features_large()  # Ensure the concatenated CSV is created
